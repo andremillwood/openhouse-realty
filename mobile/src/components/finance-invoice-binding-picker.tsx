@@ -1,0 +1,16 @@
+import {useCallback,useEffect,useRef,useState} from 'react';
+import {ActivityIndicator,Pressable,Text,TextInput,View} from 'react-native';
+import {financeInvoiceBindings} from '../lib/finance-invoice-bindings';
+import {invoiceAccess} from '../lib/invoice-access';
+import {supabase} from '../lib/supabase';
+import {useLoad} from './use-load';
+import {styles} from './styles';
+export function FinanceInvoiceBindingPicker({owner,kind,property,onSelect}:{owner:string;kind:'property'|'work';property:string|null;onSelect:(value:{id:string;label:string})=>void}){
+ const [term,setTerm]=useState(''),[query,setQuery]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);const mounted=useRef(true),active=useRef(false),complete=useRef(false),epoch=useRef(0);
+ useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+ const loader=useCallback(()=>{if(!supabase)throw Error();return financeInvoiceBindings(supabase,owner,kind,query,property);},[owner,kind,query,property]),result=useLoad(JSON.stringify([owner,kind,property,query]),loader);
+ async function select(id:string){if(!mounted.current||active.current||complete.current||!supabase||!result.data||result.loading||result.error)return;const snapshot=result.data,item=snapshot.items.find(i=>i.id===id);if(!item)return;const token=epoch.current;active.current=true;setBusy(true);setMessage('');try{const current=await invoiceAccess(supabase,owner);if(!current||current.organization!==snapshot.organization||current.role!==snapshot.role||current.revision!==snapshot.revision)throw Error();if(mounted.current&&token===epoch.current){complete.current=true;onSelect({id:item.id,label:item.label});}}catch{if(mounted.current&&token===epoch.current)setMessage('Selection could not be confirmed. Refresh invoice access and search again.');}finally{active.current=false;if(mounted.current&&token===epoch.current)setBusy(false);}}
+ const search=<View style={styles.card}><Text style={styles.heading}>Choose a {kind}</Text><TextInput accessibilityLabel={`Search ${kind} labels`} maxLength={120} value={term} editable={!busy} onChangeText={v=>{if(!active.current&&!complete.current)setTerm(v);}} style={styles.input}/><Pressable accessibilityRole="button" disabled={busy} onPress={()=>{if(active.current||complete.current)return;epoch.current++;setQuery(term.trim());setMessage('');result.retry();}}><Text style={styles.link}>Search labels</Text></Pressable></View>;
+ if(result.loading)return <View>{search}<ActivityIndicator accessibilityLabel="Loading invoice bindings"/></View>;if(result.error||!result.data)return <View>{search}<Text accessibilityRole="alert">Invoice bindings unavailable.</Text></View>;const r=result.data;
+ return <View style={styles.card}>{search}<Text style={styles.body}>Search returns up to 25 organization labels.</Text>{r.more&&<Text style={styles.body}>More matches exist. Refine the search.</Text>}{!r.items.length&&<Text style={styles.body}>No matching {kind} labels.</Text>}{r.items.map(item=><Pressable key={item.id} accessibilityRole="button" disabled={busy} onPress={()=>void select(item.id)} style={styles.card}><Text style={styles.heading}>{item.label} →</Text></Pressable>)}{!!message&&<Text accessibilityRole="alert">{message}</Text>}{busy&&<ActivityIndicator accessibilityLabel="Checking invoice access"/>}</View>;
+}

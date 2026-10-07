@@ -1,0 +1,6 @@
+// Uses the public application key only; never prints credentials or record content.
+const fs=require('fs');
+const env=Object.fromEntries(fs.readFileSync('.env.local','utf8').split(/\r?\n/).filter(line=>/^[A-Z][A-Z0-9_]*=/.test(line)).map(line=>{const index=line.indexOf('=');return [line.slice(0,index),line.slice(index+1).replace(/^['"]|['"]$/g,'')]}));
+const origin=env.NEXT_PUBLIC_SUPABASE_URL,key=env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY||env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+if(origin!=='https://zikxzkbfxgdilykyyswt.supabase.co'||!key)throw Error('Expected project/public key unavailable');
+(async()=>{const url=new URL('/rest/v1/viewing_events',origin);url.search=new URLSearchParams({select:'id,viewings!inner(organization_id)','viewings.organization_id':'eq.00000000-0000-4000-8000-000000000000',event_name:'eq.confirm',limit:'0'});const response=await fetch(url,{headers:{apikey:key}});const result=await response.json();if(response.status!==401||result.code!=='42501')throw Error('Unexpected anonymous relation contract response: '+response.status+' '+String(result.code));console.log('PASS: live REST recognizes demand relation/filter request and rejects anonymous reads (42501); authenticated count acceptance remains open');})().catch(error=>{console.error(error.message);process.exitCode=1});

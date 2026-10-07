@@ -1,0 +1,14 @@
+import type {SupabaseClient} from '@supabase/supabase-js';
+import {managerWorkDetail} from './manager-work-detail';
+import {managerAccess} from './manager-access';
+import {workState} from './manager-work';
+import {validId} from './catalog';
+export async function managerWorkHistory(client:SupabaseClient,owner:string,id:string,pageInput:number){
+ const work=await managerWorkDetail(client,owner,id),access=await managerAccess(client,owner);if(!work||!access)throw new Error('Approved work access required.');
+ const query=(head=false)=>client.from('work_order_changes').select('id,organization_id,work_order_id,actor_user_id,action,previous_status,new_status,previous_priority,new_priority,version,reason,created_at',{head,count:'exact'}).eq('organization_id',access.organization).eq('work_order_id',id);
+ const count=await query(true);if(count.error||!Number.isSafeInteger(count.count)||count.count!<0)throw new Error('Work audit unavailable.');const total=count.count!,pages=Math.max(1,Math.ceil(total/25)),page=Math.min(Math.max(1,Number.isSafeInteger(pageInput)?pageInput:1),pages);
+ const response=total?await query().order('created_at',{ascending:false}).order('id',{ascending:true}).range((page-1)*25,page*25-1):{data:[],error:null};if(response.error||!Array.isArray(response.data)||response.data.length>25)throw new Error('Work audit unavailable.');
+ const priority=(v:unknown)=>typeof v==='string'&&['low','standard','high','urgent'].includes(v);
+ const rows=response.data.map(r=>{if(!validId(r.id)||r.organization_id!==access.organization||r.work_order_id!==id||!validId(r.actor_user_id)||!['create','triage','cancel','assign','unassign','schedule','unschedule','check_in','check_out','submit_completion','request_changes','approve_completion','return_visit'].includes(r.action)||!workState(r.new_status)||r.previous_status!==null&&!workState(r.previous_status)||!priority(r.new_priority)||r.previous_priority!==null&&!priority(r.previous_priority)||!Number.isInteger(r.version)||r.version<1||r.version>=2147483647||typeof r.reason!=='string'||r.reason.trim().length<5||r.reason.length>500||typeof r.created_at!=='string'||!Number.isFinite(Date.parse(r.created_at)))throw new Error('Invalid work audit event.');return {id:r.id as string,actor:r.actor_user_id as string,action:r.action as string,before:r.previous_status as string|null,state:r.new_status as string,previousPriority:r.previous_priority as string|null,priority:r.new_priority as string,version:r.version as number,reason:r.reason as string,created:r.created_at as string};});if(new Set(rows.map(r=>r.id)).size!==rows.length)throw new Error('Invalid work events.');
+ const current=await managerAccess(client,owner);if(!current||current.organization!==access.organization||current.role!==access.role||current.revision!==access.revision||!await managerWorkDetail(client,owner,id))throw new Error('Work access changed.');return {total,pages,page,rows};
+}

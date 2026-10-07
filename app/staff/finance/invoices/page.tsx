@@ -1,0 +1,15 @@
+import {notFound,redirect} from 'next/navigation';
+import {catalogAccess} from '@/lib/staff/access';
+import {SiteHeader} from '@/components/discovery/site-header';
+import {InvoiceIntake} from '@/components/finance/invoice-intake';
+import {formatJmdMinor} from '@/lib/finance/money';
+export const dynamic='force-dynamic';
+export default async function Invoices({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
+ const {client,user,membership}=await catalogAccess(['admin','manager','finance']);if(!user)redirect('/sign-in');if(!membership)notFound();
+ const input=await searchParams,state=typeof input.state==='string'&&['submitted','under_review','approved','rejected'].includes(input.state)?input.state:'',page=typeof input.page==='string'&&/^\d{1,5}$/.test(input.page)?Math.max(1,Number(input.page)):1;
+ const href=(next:number)=>`/staff/finance/invoices?${new URLSearchParams({page:String(next),...(state?{state}:{})})}`;
+ const query=(head=false)=>{let q=client.from('reviewed_vendor_invoices').select('id,vendor_name,invoice_number,amount_minor,state,submitted_at',{head,count:'exact'}).eq('organization_id',membership.organization_id);if(state)q=q.eq('state',state);return q;};
+ const count=await query(true);if(count.error)throw new Error('Unable to count vendor invoices.');const pages=Math.max(1,Math.ceil((count.count||0)/25));if(page>pages)redirect(href(pages));
+ const rows=await query().order('submitted_at',{ascending:false}).order('id').range((page-1)*25,page*25-1);
+ return <><SiteHeader/><main className="account-layout"><section className="account-card"><p className="eyebrow">Finance operations</p><h1>Vendor invoices</h1><p>Track submitted invoices through independent review and approval. Approval does not mean paid or posted to the ledger.</p><InvoiceIntake allowPropertySearch={['admin','finance'].includes(membership.role)}/>{membership.role==='manager'&&<p>For a property or work-order invoice, open the managed property or work record and submit from there. <a href="/staff/properties">Managed properties →</a></p>}<form className="filter-bar" action="/staff/finance/invoices"><label>Invoice state<select name="state" defaultValue={state}><option value="">All states</option>{['submitted','under_review','approved','rejected'].map(value=><option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></label><button className="secondary">Apply filter</button></form>{rows.error?<p role="alert">Unable to load invoices. Refresh before reviewing.</p>:rows.data?.length?rows.data.map(row=><article className="staff-editor" key={row.id}><h2><a href={`/staff/finance/invoices/${row.id}`}>{row.vendor_name} · {row.invoice_number}</a></h2><p>{row.state.replaceAll('_',' ')} · {formatJmdMinor(String(row.amount_minor))}</p></article>):<p>No invoices in this view.</p>}<nav className="results-toolbar" aria-label="Invoice pages">{page>1?<a href={href(page-1)}>← Previous</a>:<span/>}<span>{count.count||0} invoices · Page {page} of {pages}</span>{page<pages?<a href={href(page+1)}>Next →</a>:<span/>}</nav><a href="/account">Your account →</a></section></main></>;
+}

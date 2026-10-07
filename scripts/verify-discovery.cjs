@@ -1,0 +1,22 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict');
+function load(path){const module={exports:{}};new Function('exports','module',ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(module.exports,module);return module.exports;}
+const {rankRealtors}=load('lib/discovery/realtor-matching.ts');
+const preferences={intent:'rent',preferred_area:'Kingston',communication_style:'thoughtful',guidance_style:'step-by-step',decision_pace:'considered'};
+const profile={id:'one',display_name:'A',bio:'',photo_url:null,service_areas:['Kingston'],supported_intents:['rent'],communication_style:'thoughtful',guidance_style:'step-by-step',decision_pace:'considered'};
+assert.equal(rankRealtors([profile],preferences)[0].points,8);
+assert.equal(rankRealtors([{...profile,supported_intents:['buy']}],preferences).length,0);
+assert.equal(rankRealtors([{...profile,service_areas:['Other']}],preferences).length,0);
+assert.equal(rankRealtors([{...profile,communication_style:'direct'}],preferences)[0].points,6);
+assert.deepEqual(rankRealtors([profile,{...profile,id:'two',display_name:'B'}],preferences).map(x=>x.realtor.id),['one','two']);
+const {enquiryInput}=load('lib/enquiries/validation.ts');
+const enquiry={request_id:'22334455-0000-4000-8000-000000000006',listing_id:'22334455-0000-4000-8000-000000000005',realtor_id:null,contact_name:'Test Person',phone:'',message:'A complete enquiry message.',consent:true,user_id:'spoof',contact_email:'spoof@example.invalid'};
+assert.equal(enquiryInput(enquiry).p_message,enquiry.message);
+assert.equal(enquiryInput(enquiry).user_id,undefined);
+for(const invalid of [{consent:false},{request_id:'bad'},{message:'short'},{realtor_id:enquiry.listing_id},{listing_id:null},{phone:'x'.repeat(41)}])assert.throws(()=>enquiryInput({...enquiry,...invalid}));
+const {sameOrigin}=load('lib/http/origin.ts');
+assert.equal(sameOrigin(new Request('http://localhost:3001/api/enquiries',{headers:{host:'127.0.0.1:3001',origin:'http://127.0.0.1:3001'}})),true);
+assert.equal(sameOrigin(new Request('http://localhost:3001/api/enquiries',{headers:{host:'127.0.0.1:3001',origin:'https://malicious.example'}})),false);
+assert.equal(sameOrigin(new Request('http://localhost:3001/api/enquiries',{headers:{host:'127.0.0.1:3001',origin:'null'}})),false);
+assert.equal(sameOrigin(new Request('http://localhost:3001/api/enquiries',{headers:{host:'app.example',origin:'https://app.example','x-forwarded-proto':'https'}})),true);
+const {boundedText}=load('lib/http/body.ts');
+(async()=>{assert.equal(await boundedText(new Request('https://example.invalid',{method:'POST',body:'small'}),10),'small');await assert.rejects(()=>boundedText(new Request('https://example.invalid',{method:'POST',body:'too much content'}),4));await assert.rejects(()=>boundedText(new Request('https://example.invalid',{method:'POST',body:'ééé'}),5));console.log('PASS: eligible realtor ranking, transparent scores, enquiry consent/target validation, identity spoof stripping and byte-limited bodies');})().catch(error=>{console.error(error);process.exit(1);});

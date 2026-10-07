@@ -1,0 +1,17 @@
+import type {SupabaseClient} from '@supabase/supabase-js';
+import {ownerAccessInput} from '../../../lib/owners/access-validation';
+import {adminOwnerAccessDetail} from './admin-owner-access-detail';
+import {managerAccess} from './manager-access';
+import {EnquiryFailure} from './enquiries';
+export type OwnerAccessCommand=Readonly<{access_id:string;version:number;request_id:string;is_active:boolean;reason:string;approved:true}>;
+export function ownerAccessCommand(value:OwnerAccessCommand):OwnerAccessCommand{const r=ownerAccessInput(value);if(!r.p_access_id)throw new EnquiryFailure('Existing owner access required.',false);return Object.freeze({access_id:r.p_access_id,version:r.p_expected_version,request_id:r.p_request_id,is_active:r.p_is_active,reason:r.p_reason,approved:true});}
+export async function sendOwnerAccessCommand(client:SupabaseClient,owner:string,value:OwnerAccessCommand){
+ let input:OwnerAccessCommand,access:NonNullable<Awaited<ReturnType<typeof managerAccess>>>,parent:NonNullable<Awaited<ReturnType<typeof adminOwnerAccessDetail>>>;
+ try{input=ownerAccessCommand(value);const membership=await managerAccess(client,owner),assignment=await adminOwnerAccessDetail(client,owner,input.access_id);if(!membership||membership.role!=='admin'||!assignment)throw Error();const latest=await managerAccess(client,owner);if(!latest||latest.organization!==membership.organization||latest.role!==membership.role||latest.revision!==membership.revision)throw Error();access=membership;parent=assignment;}catch{throw new EnquiryFailure('Check current management access and approved owner access decision.',false);}
+ let response;try{response=await client.rpc('author_owner_property_access',ownerAccessInput(input));}catch{throw new EnquiryFailure('Owner access decision could not be confirmed. Retry the same request.',true);}
+ if(response.error)throw new EnquiryFailure('Owner access decision could not be confirmed. Check current access or retry the same request.',!['42501','22023','22P02','40001','23505'].includes(response.error.code));
+ try{const ack=response.data;if(!ack||ack.id!==input.access_id||ack.version!==input.version+1)throw Error();const event=await client.from('owner_property_access_changes').select('organization_id,access_id,actor_user_id,request_id,before_record,after_record,version,reason').eq('organization_id',access.organization).eq('access_id',input.access_id).eq('actor_user_id',owner).eq('request_id',input.request_id).maybeSingle(),r=event.data;
+ if(event.error||!r||r.organization_id!==access.organization||r.access_id!==input.access_id||r.actor_user_id!==owner||r.request_id!==input.request_id||typeof r.before_record?.is_active!=='boolean'||r.after_record?.is_active!==input.is_active||r.version!==ack.version||r.reason!==input.reason)throw Error();const current=await adminOwnerAccessDetail(client,owner,input.access_id),membership=await managerAccess(client,owner);
+ if(!current||current.version<ack.version||current.version===ack.version&&current.active!==input.is_active||current.user!==parent.user||current.property.property!==parent.property.property||!membership||membership.organization!==access.organization||membership.role!==access.role||membership.revision!==access.revision)throw Error();return {id:input.access_id,active:input.is_active,version:ack.version as number,currentActive:current.active,currentVersion:current.version};
+ }catch{throw new EnquiryFailure('Recorded owner access decision could not be confirmed. Retry the same request.',true);}
+}

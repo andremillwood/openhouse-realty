@@ -1,0 +1,15 @@
+import type {SupabaseClient} from '@supabase/supabase-js';
+import {visitInput} from '../../../lib/staff/visit-validation';
+import {contractorWorkOffer} from './work-offers';
+import {validId} from './catalog';
+import {EnquiryFailure} from './enquiries';
+export type ContractorVisitAttempt=Readonly<{assignment:string;visit_id:string;request_id:string;version:number;action:'confirm'|'decline'|'cancel';reason:string}>;
+export function contractorVisitAttempt(value:ContractorVisitAttempt):ContractorVisitAttempt{const input=visitInput(value);if(!validId(value.assignment)||!['confirm','decline','cancel'].includes(input.p_action))throw new EnquiryFailure('Contractor visit response required.',false);return Object.freeze({assignment:value.assignment,visit_id:input.p_visit_id!,request_id:input.p_request_id,version:input.p_expected_version,action:input.p_action as ContractorVisitAttempt['action'],reason:input.p_reason});}
+async function ownVisit(client:SupabaseClient,owner:string,input:ContractorVisitAttempt){if(!await contractorWorkOffer(client,owner,input.assignment))throw Error();const result=await client.from('contractor_visits').select('id,offer_id,contractor_user_id,state,version').eq('id',input.visit_id).eq('offer_id',input.assignment).eq('contractor_user_id',owner).maybeSingle();const r=result.data;if(result.error||!r||r.id!==input.visit_id||r.offer_id!==input.assignment||r.contractor_user_id!==owner||!['proposed','confirmed','declined','cancelled','completed'].includes(r.state)||!Number.isInteger(r.version)||r.version<1||r.version>=2147483647)throw Error();return {state:r.state as string,version:r.version as number};}
+export async function respondToContractorVisit(client:SupabaseClient,owner:string,attempt:ContractorVisitAttempt){
+ let input:ContractorVisitAttempt;try{input=contractorVisitAttempt(attempt);await ownVisit(client,owner,input);}catch{throw new EnquiryFailure('Verify your assigned contractor visit before responding.',false);}
+ let response;try{response=await client.rpc('manage_contractor_visit',visitInput(input));}catch{throw new EnquiryFailure('Visit response could not be confirmed. Retry the same request.',true);}
+ if(response.error)throw new EnquiryFailure('Visit response could not be confirmed. Refresh or retry the same request.',!['42501','22023','22P02','40001','23505'].includes(response.error.code));
+ const r=response.data,expected=input.action==='confirm'?'confirmed':input.action==='decline'?'declined':'cancelled';
+ try{if(!r||r.id!==input.visit_id||r.version!==input.version+1||r.state!==expected)throw Error();const current=await ownVisit(client,owner,input);if(current.version<r.version||current.version===r.version&&current.state!==r.state)throw Error();if(!await contractorWorkOffer(client,owner,input.assignment))throw Error();return {id:input.visit_id,version:r.version as number,state:r.state as string,currentVersion:current.version,currentState:current.state};}catch{throw new EnquiryFailure('Recorded visit response could not be confirmed. Retry the same request.',true);}
+}

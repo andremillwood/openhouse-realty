@@ -1,0 +1,14 @@
+import {useEffect,useRef,useState} from 'react';
+import {Pressable,Text,TextInput,View} from 'react-native';
+import {cancelViewing} from '../lib/viewings';
+import {EnquiryFailure} from '../lib/enquiries';
+import {supabase} from '../lib/supabase';
+import {styles} from './styles';
+export function CancelViewing({owner,id,onChanged}:{owner:string;id:string;onChanged:()=>void}){
+ const [reason,setReason]=useState(''),[open,setOpen]=useState(false),[busy,setBusy]=useState(false),[uncertain,setUncertain]=useState(false),[message,setMessage]=useState(''),[done,setDone]=useState(false);
+ const active=useRef(false),mounted=useRef(true),attempt=useRef<string|null>(null),complete=useRef(false);
+ useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+ async function cancel(){if(active.current||complete.current||!mounted.current)return;active.current=true;setBusy(true);const retrying=attempt.current!==null;try{if(!supabase)throw new EnquiryFailure('Connection unavailable.',false);const frozen=attempt.current??reason;attempt.current=frozen;const status=await cancelViewing(supabase,owner,id,frozen);if(!mounted.current)return;complete.current=true;setDone(true);setUncertain(false);setMessage(status==='cancelled'?'Your appointment is cancelled.':`Recorded status: ${status.replace('_',' ')}. Refresh your appointments.`);}catch(error){if(mounted.current){const unknown=retrying||!(error instanceof EnquiryFailure)||error.uncertain;setUncertain(unknown);if(!unknown)attempt.current=null;setMessage(error instanceof EnquiryFailure?error.message:'Unable to confirm cancellation. Retry the same cancellation.');}}finally{active.current=false;if(mounted.current)setBusy(false);}}
+ if(!open)return <Pressable accessibilityRole="button" onPress={()=>setOpen(true)}><Text style={styles.link}>Cancel appointment</Text></Pressable>;
+ return <View style={{gap:12}}>{!done&&<><Text style={styles.body}>Cancellation reason shared with the team</Text><TextInput accessibilityLabel="Cancellation reason" value={reason} onChangeText={setReason} editable={!busy&&!uncertain} multiline maxLength={500} style={styles.input}/><Pressable accessibilityRole="button" disabled={busy||(!uncertain&&reason.trim().length<5)} onPress={()=>void cancel()} style={styles.button}><Text style={styles.buttonText}>{busy?'Confirming…':uncertain?'Retry same cancellation':'Confirm cancellation'}</Text></Pressable>{!uncertain&&!busy&&<Pressable accessibilityRole="button" onPress={()=>{setOpen(false);setMessage('');}}><Text style={styles.link}>Keep appointment</Text></Pressable>}</>}{!!message&&<Text accessibilityRole={done?'text':'alert'} style={styles.body}>{message}</Text>}{done&&<Pressable accessibilityRole="button" onPress={onChanged}><Text style={styles.link}>Refresh appointments</Text></Pressable>}</View>;
+}

@@ -1,0 +1,19 @@
+import {FinanceChequeBankHistory} from '../components/finance-cheque-bank-history';
+import {useCallback} from 'react';
+import {ActivityIndicator,Pressable,ScrollView,Text,View} from 'react-native';
+import {Link,useLocalSearchParams} from 'expo-router';
+import {useIdentity} from '../components/identity';
+import {useLoad} from '../components/use-load';
+import {styles} from '../components/styles';
+import {financeChequeHistory} from '../lib/finance-cheque-history';
+import {formatJmdMinor} from '../lib/finance-statement';
+import {validId} from '../lib/catalog';
+import {supabase} from '../lib/supabase';
+const when=(v:string)=>new Date(v).toLocaleString('en-JM',{timeZone:'America/Jamaica'});
+const actionLabels={receive:'Receipt recorded',cancel:'Receipt cancelled',record_deposit:'Deposit recorded',confirm_clear:'Clearance confirmed',record_return:'Return recorded'};
+export default function Cheque(){const params=useLocalSearchParams<{id?:string|string[]}>(),id=typeof params.id==='string'?params.id:'';const {user,loading}=useIdentity();if(loading)return <ActivityIndicator accessibilityLabel="Checking account"/>;if(!validId(id))return <Text accessibilityRole="alert">Valid cheque reference required.</Text>;if(!user)return <View style={styles.page}><Link href="/sign-in" style={styles.link}>Sign in to review cheque custody →</Link></View>;return <Detail key={JSON.stringify([user.id,id])} owner={user.id} id={id}/>;}
+function Detail({owner,id}:{owner:string;id:string}){const loader=useCallback(()=>{if(!supabase)throw Error();return financeChequeHistory(supabase,owner,id);},[owner,id]),result=useLoad(JSON.stringify([owner,id]),loader);
+ if(result.loading)return <ActivityIndicator accessibilityLabel="Loading complete cheque custody history"/>;
+ if(result.error||!result.data)return <View style={styles.page}><Text accessibilityRole="alert">Cheque and complete custody history unavailable. Check verified administrator or finance access and refresh.</Text><Pressable accessibilityRole="button" onPress={result.retry}><Text style={styles.link}>Refresh cheque</Text></Pressable><Link href="/finance-cheques" style={styles.link}>Cheque custody register →</Link></View>;
+ const {cheque:r,rows}=result.data;return <ScrollView contentContainerStyle={styles.page}><Text style={styles.title}>{r.payer}</Text><Text style={styles.heading}>{r.bank} · Cheque {r.number}</Text><Text style={styles.heading}>{formatJmdMinor(r.amount)}</Text><Text style={styles.body}>{r.state} · Revision {r.version}</Text><Text selectable style={styles.body}>Cheque reference: {r.id}</Text><Text style={styles.body}>Property reference: {r.property}</Text><Text style={styles.body}>Received by {r.receiver} · {when(r.received)} (Jamaica time)</Text>{r.cancelled&&<Text style={styles.body}>Cancelled {when(r.cancelled)} (Jamaica time)</Text>}<Text style={styles.body}>Receipt records custody. Bank decisions require certified matching documents and retain their evidence. Ledger posting and bank reconciliation are separate workflows.</Text><FinanceChequeBankHistory key={JSON.stringify([owner,id,r.version])} owner={owner} id={id} version={r.version} onRefresh={result.retry}/><Text style={styles.heading}>Complete custody history</Text>{rows.map(event=><View key={event.id} style={styles.card}><Text style={styles.heading}>{actionLabels[event.action]} · Revision {event.version}</Text><Text style={styles.body}>{event.previous??'New receipt'} → {event.state}</Text><Text style={styles.body}>{event.reason}</Text><Text style={styles.body}>Actor: {event.actor} · {when(event.created)} (Jamaica time)</Text><Text selectable style={styles.body}>Request reference: {event.request}</Text></View>)}<Pressable accessibilityRole="button" onPress={result.retry}><Text style={styles.link}>Refresh cheque</Text></Pressable><Link href="/finance-cheques" style={styles.link}>Cheque custody register →</Link></ScrollView>;
+}

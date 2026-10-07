@@ -1,0 +1,17 @@
+import type {SupabaseClient} from '@supabase/supabase-js';
+import {securityAssignmentInput} from '../../../lib/staff/security-assignment-validation';
+import {managerSecurityAssignment} from './manager-security-assignment';
+import {managerAccess} from './manager-access';
+import {EnquiryFailure} from './enquiries';
+export type SecurityCommand=Readonly<{assignment_id:string;version:number;request_id:string;is_active:boolean;reason:string;approved:true}>;
+export function securityCommand(value:SecurityCommand):SecurityCommand{const r=securityAssignmentInput(value);if(!r.p_assignment_id)throw new EnquiryFailure('Existing assignment required.',false);return Object.freeze({assignment_id:r.p_assignment_id,version:r.p_expected_version,request_id:r.p_request_id,is_active:r.p_is_active,reason:r.p_reason,approved:true});}
+export async function sendSecurityCommand(client:SupabaseClient,owner:string,value:SecurityCommand){
+ let input:SecurityCommand,access:NonNullable<Awaited<ReturnType<typeof managerAccess>>>,parent:NonNullable<Awaited<ReturnType<typeof managerSecurityAssignment>>>;
+ try{input=securityCommand(value);const membership=await managerAccess(client,owner),assignment=await managerSecurityAssignment(client,owner,input.assignment_id);if(!membership||!assignment)throw Error();const latest=await managerAccess(client,owner);if(!latest||latest.organization!==membership.organization||latest.role!==membership.role||latest.revision!==membership.revision)throw Error();access=membership;parent=assignment;}catch{throw new EnquiryFailure('Check current management access and approved assignment decision.',false);}
+ let response;try{response=await client.rpc('author_property_security_assignment',securityAssignmentInput(input));}catch{throw new EnquiryFailure('Assignment decision could not be confirmed. Retry the same request.',true);}
+ if(response.error)throw new EnquiryFailure('Assignment decision could not be confirmed. Check current access or retry the same request.',!['42501','22023','22P02','40001','23505'].includes(response.error.code));
+ try{const ack=response.data;if(!ack||ack.id!==input.assignment_id||ack.version!==input.version+1)throw Error();const event=await client.from('property_security_assignment_changes').select('organization_id,assignment_id,actor_user_id,request_id,previous_active,new_active,version,reason').eq('organization_id',access.organization).eq('assignment_id',input.assignment_id).eq('actor_user_id',owner).eq('request_id',input.request_id).maybeSingle(),r=event.data;
+ if(event.error||!r||r.organization_id!==access.organization||r.assignment_id!==input.assignment_id||r.actor_user_id!==owner||r.request_id!==input.request_id||typeof r.previous_active!=='boolean'||r.new_active!==input.is_active||r.version!==ack.version||r.reason!==input.reason)throw Error();const current=await managerSecurityAssignment(client,owner,input.assignment_id),membership=await managerAccess(client,owner);
+ if(!current||current.version<ack.version||current.version===ack.version&&current.active!==input.is_active||current.user!==parent.user||current.property.property!==parent.property.property||!membership||membership.organization!==access.organization||membership.role!==access.role||membership.revision!==access.revision)throw Error();return {id:input.assignment_id,active:input.is_active,version:ack.version as number,currentActive:current.active,currentVersion:current.version};
+ }catch{throw new EnquiryFailure('Recorded assignment decision could not be confirmed. Retry the same request.',true);}
+}

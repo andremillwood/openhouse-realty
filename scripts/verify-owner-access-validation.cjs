@@ -1,0 +1,10 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict'),m={exports:{}};
+new Function('exports','module',ts.transpileModule(fs.readFileSync('lib/owners/access-validation.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(m.exports,m);
+const {ownerAccessInput}=m.exports,id='44556600-0000-4000-8000-000000000001',body={request_id:id,access_id:null,version:0,property_id:id,email:' Owner@example.invalid ',is_active:true,reason:' Approved access ',approved:true,organization_id:'spoof',user_id:'spoof',actor_user_id:'spoof'};
+assert.deepEqual(ownerAccessInput(body),{p_request_id:id,p_access_id:null,p_expected_version:0,p_property_id:id,p_email:'owner@example.invalid',p_is_active:true,p_reason:'Approved access',p_approved:true});
+for(const patch of [{request_id:'bad'},{access_id:'bad'},{version:1},{version:-1},{version:1.5},{version:'0'},{version:2147483647},{property_id:'bad'},{property_id:null},{email:'not-an-email'},{email:'a'.repeat(255)+'@example.invalid'},{email:null},{is_active:false},{is_active:'true'},{reason:'tiny'},{reason:'a'.repeat(501)},{approved:false},{approved:'true'}])assert.throws(()=>ownerAccessInput({...body,...patch}));
+const existing={...body,access_id:id,version:1,property_id:null,email:null,is_active:false};
+assert.equal(ownerAccessInput(existing).p_email,null);assert.equal(ownerAccessInput(existing).p_property_id,null);assert.equal(ownerAccessInput(existing).p_expected_version,1);
+for(const patch of [{version:0},{property_id:id},{email:'different@example.invalid'}])assert.throws(()=>ownerAccessInput({...existing,...patch}));
+for(const value of [null,[],true,'request'])assert.throws(()=>ownerAccessInput(value));
+console.log('PASS: owner access approval, identity immutability, versions, input bounds and authority-field exclusion');

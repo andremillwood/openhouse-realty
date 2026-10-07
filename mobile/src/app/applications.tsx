@@ -1,0 +1,19 @@
+import {useCallback} from 'react';
+import {ActivityIndicator,FlatList,Pressable,Text,View} from 'react-native';
+import {Link,router,useLocalSearchParams} from 'expo-router';
+import {useIdentity} from '../components/identity';
+import {useLoad} from '../components/use-load';
+import {styles} from '../components/styles';
+import {catalogQuery} from '../lib/catalog';
+import {ownedApplications} from '../lib/applications';
+import {supabase} from '../lib/supabase';
+export default function Applications(){
+ const {user,loading,error,refresh}=useIdentity();const page=catalogQuery(useLocalSearchParams<Record<string,string|string[]>>()).page;
+ if(loading)return <View style={styles.page}><ActivityIndicator accessibilityLabel="Checking your account"/></View>;
+ if(!user)return <View style={styles.page}><Text style={styles.title}>Your applications.</Text><Text style={styles.body}>{error||'Sign in with your verified account to check stored applications.'}</Text><Link href="/sign-in" style={styles.link}>Sign in →</Link>{!!error&&<Pressable accessibilityRole="button" onPress={()=>void refresh()}><Text style={styles.link}>Check account again</Text></Pressable>}</View>;
+ return <ApplicationHistory key={user.id+':'+page} owner={user.id} page={page}/>;
+}
+function ApplicationHistory({owner,page}:{owner:string;page:number}){
+ const loader=useCallback(()=>{if(!supabase)throw new Error('Connection unavailable');return ownedApplications(supabase,owner,page);},[owner,page]);const result=useLoad(owner+':'+page,loader);
+ return <FlatList contentContainerStyle={styles.page} data={result.data?.rows||[]} keyExtractor={row=>row.id} ItemSeparatorComponent={()=><View style={{height:18}}/>} renderItem={({item})=><View style={styles.card}><Text style={styles.heading}>{item.title_snapshot}</Text><Text style={styles.body}>Recorded status: {item.status.replaceAll('_',' ')}</Text><Text style={styles.body}>Submitted {new Date(item.created_at).toLocaleString('en-JM',{timeZone:'America/Jamaica'})}</Text><Link href={{pathname:'/applications/[id]',params:{id:item.id}}} style={styles.link}>Review application →</Link><Text selectable style={styles.body}>Reference: {item.id}</Text>{item.listing_id&&<Link href={{pathname:'/listings/[id]',params:{id:item.listing_id}}} style={styles.link}>View published property →</Link>}</View>} ListHeaderComponent={<View style={{gap:18}}><Text style={styles.title}>Your applications.</Text><Text style={styles.body}>Review your stored rental applications. Approval is not a signed lease or an activated tenancy.</Text>{result.loading?<ActivityIndicator accessibilityLabel="Loading applications"/>:result.error?<><Text accessibilityRole="alert" style={styles.body}>Unable to load your applications.</Text><Pressable accessibilityRole="button" onPress={result.retry}><Text style={styles.link}>Try again</Text></Pressable></>:result.data&&<><Text style={styles.body}>{result.data.total} applications · Page {result.data.page} of {result.data.pages}</Text>{result.data.total===0?<Text style={styles.body}>No stored applications for this account.</Text>:result.data.rows.length===0&&<Text style={styles.body}>Your applications changed while loading. Refresh to see the current records.</Text>}</>}</View>} ListFooterComponent={result.data&&<View style={{gap:18,paddingTop:24}}><View style={{flexDirection:'row',justifyContent:'space-between'}}><Pressable accessibilityRole="button" disabled={result.data.page===1} onPress={()=>router.setParams({page:String(result.data!.page-1)})}><Text style={styles.link}>← Previous</Text></Pressable><Pressable accessibilityRole="button" disabled={result.data.page===result.data.pages} onPress={()=>router.setParams({page:String(result.data!.page+1)})}><Text style={styles.link}>Next →</Text></Pressable></View><Pressable accessibilityRole="button" onPress={result.retry}><Text style={styles.link}>Refresh applications</Text></Pressable></View>}/>;
+}

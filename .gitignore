@@ -6,4 +6,5 @@ node_modules/
 .vercel/
 coverage/
 *.log
+*.tsbuildinfo
 .DS_Store

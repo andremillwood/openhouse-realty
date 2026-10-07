@@ -19,7 +19,7 @@ export async function createClient() {
             );
           } catch {
             // Server Components cannot always write cookies.
-            // Token refresh will be handled by the auth proxy when it is added.
+            // The auth proxy refreshes sessions before protected pages render.
           }
         },
       },

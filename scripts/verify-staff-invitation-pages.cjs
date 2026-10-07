@@ -1,0 +1,23 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+const id='55667788-0000-4000-8000-000000000001';
+async function run(path,input={},config={}){
+ const calls=[],cache={},user=config.user===undefined?{id,email:'recipient@example.invalid',email_confirmed_at:'verified'}:config.user,membership=config.membership===undefined?{organization_id:'own'}:config.membership;
+ const summary={id,organization_name:'Inviting organization',invite_email:'recipient@example.invalid',role:'finance',state:'pending',version:1,expires_at:'2099-01-01',can_accept:true,can_decline:true,blocked_reason:null,...config.summary};
+ const client={auth:{getUser:async()=>({data:{user},error:null})},rpc:async(name,args)=>{calls.push(['rpc',name,args]);return {data:config.missing?null:summary,error:config.rpcError}},from(table){let head=false;const b={select(fields,options){head=options?.head;calls.push([table,'select',fields]);assert(!fields.includes('*'));return b},eq(...args){calls.push([table,'eq',...args]);return b},order(){return b},range(...args){calls.push([table,'range',...args]);return Promise.resolve({data:[],error:null})},then(resolve,reject){assert(head);return Promise.resolve({count:config.count??62,error:config.countError}).then(resolve,reject)}};return b}};
+ function load(path){if(cache[path])return cache[path];const m={exports:{}},req=name=>name==='@/lib/staff/access'?{catalogAccess:async roles=>{calls.push(['access',roles]);return {client,user,membership}}}:name==='@/lib/notifications/origin'?{notificationOrigin:()=>null}:name==='@/lib/supabase/server'?{createClient:async()=>client}:name==='next/navigation'?{useRouter:()=>({refresh(){}}),redirect(url){throw {redirect:url}},notFound(){throw {notFound:true}}}:name==='@/components/discovery/site-header'?{SiteHeader:()=>null}:name==='@/components/staff/invitation-form'?load('components/staff/invitation-form.tsx'):require(name);new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText)(req,m.exports,m);return cache[path]=m.exports;}
+ let html,exception;try{html=renderToStaticMarkup(await load(path).default({searchParams:Promise.resolve(input),params:Promise.resolve({invitationId:id})}));}catch(e){exception=e;}return {calls,html,exception};
+}
+(async()=>{
+ for(const path of ['app/staff/invitations/page.tsx','app/staff/invitations/history/page.tsx']){
+  let r=await run(path,{page:'3',organization_id:'spoof'});assert(!r.exception);assert.deepEqual(r.calls[0],['access',['admin']]);assert.equal(r.calls.filter(c=>c[1]==='eq'&&c[2]==='organization_id'&&c[3]==='own').length,2);assert.deepEqual(r.calls.find(c=>c[1]==='range').slice(2),[50,74]);
+  for(const config of [{user:null},{membership:null}]){r=await run(path,{},config);assert(r.exception);assert.equal(r.calls.length,1)}
+  r=await run(path,{page:'999'},{count:0});assert(r.exception.redirect);assert(!r.calls.some(c=>c[1]==='range'));
+  r=await run(path,{},{countError:{message:'offline'}});assert(r.exception instanceof Error);
+ }
+ let r=await run('app/account/invitations/page.tsx',{page:'2',email:'spoof'});assert(!r.exception);assert.equal(r.calls.filter(c=>c[1]==='eq'&&c[2]==='invite_email'&&c[3]==='recipient@example.invalid').length,2);assert.deepEqual(r.calls.find(c=>c[1]==='range').slice(2),[25,49]);
+ r=await run('app/account/invitations/page.tsx',{}, {user:{id,email:'recipient@example.invalid'}});assert.equal(r.exception.redirect,'/sign-in');assert.equal(r.calls.length,0);
+ const detail='app/account/invitations/[invitationId]/page.tsx';r=await run(detail);assert(!r.exception);assert.deepEqual(r.calls[0],['rpc','staff_invitation_summary',{p_invitation_id:id}]);assert.match(r.html,/Inviting organization/);assert.match(r.html,/Accept staff access/);assert.match(r.html,/<input\b(?=[^>]*name="approved")(?=[^>]*required)[^>]*>/);assert.doesNotMatch(r.html,/<input\b(?=[^>]*name="approved")(?=[^>]*checked)[^>]*>/);
+ r=await run(detail,{}, {summary:{can_accept:false,can_decline:false,blocked_reason:'Administrator approval has changed.'}});assert.match(r.html,/Administrator approval has changed/);assert.doesNotMatch(r.html,/Confirm decision/);
+ r=await run(detail,{}, {missing:true});assert(r.exception.notFound);r=await run(detail,{}, {rpcError:{message:'offline'}});assert(r.exception instanceof Error);
+ console.log('PASS: invitation pages enforce verified/admin identity before scoped reads, bounded pagination, narrow columns, recipient summary decisions and explicit unchecked consent');
+})().catch(error=>{console.error(error);process.exitCode=1});

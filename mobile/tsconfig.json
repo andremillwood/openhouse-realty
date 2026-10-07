@@ -1,0 +1,14 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/lib/enquiries/validation": [
+        "../lib/enquiries/validation.ts"
+      ],
+      "@/lib/leases/summary": [
+        "../lib/leases/summary.ts"
+      ]
+    }
+  }
+}

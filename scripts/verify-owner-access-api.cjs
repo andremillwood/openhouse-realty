@@ -1,0 +1,17 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict');let user=null,membership=null,error=null,calls=[],rolesSeen=[];const client={rpc:async(name,args)=>{calls.push({name,args});return {data:{property_id:'created',revision:1},error}}};const cache={};function load(path){if(cache[path])return cache[path];const module={exports:{}};const req=name=>{if(name==='next/server')return {NextResponse:{json:(body,options)=>new Response(JSON.stringify(body),options)}};if(name==='@/lib/staff/access')return {catalogAccess:async roles=>{rolesSeen=roles;return {client,user,membership}}};if(name.startsWith('@/lib/'))return load(name.slice(2)+'.ts');throw Error(name);};new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(req,module.exports,module);cache[path]=module.exports;return module.exports;}
+const {POST}=load('app/api/staff/owner-access/route.ts');
+const id='55667788-0000-4000-8000-000000000001',body={request_id:id,access_id:null,version:0,property_id:id,email:' Approved@example.invalid ',is_active:true,reason:'Approved portfolio access',approved:true,organization_id:'spoof',user_id:'spoof',actor_user_id:'spoof'};
+function request(body,origin='http://127.0.0.1:3001',type='application/json'){return new Request('http://localhost:3001/api/staff/owner-access',{method:'POST',headers:{host:'127.0.0.1:3001',origin,'Content-Type':type},body:JSON.stringify(body)});}
+(async()=>{
+ assert.equal((await POST(request(body))).status,401);assert.equal(calls.length,0);
+ assert.equal((await POST(request(body,'https://foreign.example'))).status,403);
+ assert.equal((await POST(request(body,undefined,'text/plain'))).status,415);
+ user={id};assert.equal((await POST(request(body))).status,403);assert.equal(calls.length,0);
+ membership={organization_id:id,role:'admin'};
+ let response=await POST(request(body));assert.equal(response.status,200);assert.equal(response.headers.get('Cache-Control'),'private, no-store');assert.deepEqual(rolesSeen,['admin']);
+ assert.deepEqual(calls.at(-1),{name:'author_owner_property_access',args:{p_request_id:id,p_access_id:null,p_expected_version:0,p_property_id:id,p_email:'approved@example.invalid',p_is_active:true,p_reason:body.reason,p_approved:true}});
+ for(const [code,status] of [['42501',403],['40001',409],['23505',409],['40P01',409],['22023',400],['22P02',400],['23503',400],['XX000',503]]){error={code,message:'Internal details'};response=await POST(request(body));assert.equal(response.status,status);assert.equal(response.headers.get('Cache-Control'),'private, no-store');assert.doesNotMatch(JSON.stringify(await response.json()),/Internal details/);}
+ error=null;let n=calls.length;assert.equal((await POST(request({...body,reason:'x'.repeat(6000)}))).status,413);assert.equal((await POST(request({...body,approved:false}))).status,400);assert.equal(calls.length,n);
+ response=await POST(request({...body,access_id:id,version:2,property_id:null,email:null,is_active:false}));assert.equal(response.status,200);assert.equal(calls.at(-1).args.p_is_active,false);assert.equal(calls.at(-1).args.p_email,null);
+ console.log('PASS: owner access API administrator/origin/body guards, canonical authority-free RPC and safe retry/conflict failures');
+})().catch(error=>{console.error(error);process.exitCode=1});

@@ -1,0 +1,12 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict'),m={exports:{}};
+new Function('exports','module',ts.transpileModule(fs.readFileSync('lib/finance/journal-validation.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(m.exports,m);
+const {journalInput}=m.exports,id='55667788-0000-4000-8000-000000000001',line={account_id:id,debit_minor:10001,credit_minor:0},body={request_id:id,currency:'JMD',memo:'Approved journal posting',reason:'Reviewed posting evidence',approved:true,lines:[line,{...line,debit_minor:0,credit_minor:10001}],organization_id:'spoof',posted_at:'spoof',actor_user_id:'spoof'};
+const result=journalInput(body);assert.equal(result.total_minor,'10001');assert(!('organization_id' in result));assert(!('posted_at' in result));assert(!('actor_user_id' in result));assert.equal(result.lines[0].property_id,null);
+for(const patch of [{request_id:'bad'},{currency:'USD'},{memo:'tiny'},{reason:'tiny'},{approved:false},{approved:'true'},{lines:[]},{lines:[line]},{lines:Array(201).fill(line)}])assert.throws(()=>journalInput({...body,...patch}));
+for(const patch of [{account_id:'bad'},{debit_minor:0},{debit_minor:1.5},{debit_minor:'10001'},{debit_minor:-1},{debit_minor:Infinity},{debit_minor:NaN},{debit_minor:100000000000000},{credit_minor:1},{property_id:'bad'},{unit_id:id},{unit_id:'bad',property_id:id}])assert.throws(()=>journalInput({...body,lines:[{...line,...patch},body.lines[1]]}));
+assert.throws(()=>journalInput({...body,lines:[line,{...line,debit_minor:0,credit_minor:10000}]}));
+const dimension=journalInput({...body,lines:[{...line,property_id:id,unit_id:id,actor_user_id:'spoof'},body.lines[1]]});assert.equal(dimension.lines[0].unit_id,id);assert(!('actor_user_id' in dimension.lines[0]));
+const max=99999999999999,large=journalInput({...body,lines:[...Array.from({length:100},()=>({...line,debit_minor:max})),...Array.from({length:100},()=>({...line,debit_minor:0,credit_minor:max}))]});assert.equal(large.total_minor,'9999999999999900');
+assert.throws(()=>journalInput({...body,lines:[...large.lines.slice(0,199),{...line,debit_minor:0,credit_minor:max-1}]}));
+for(const value of [null,[],false,'text'])assert.throws(()=>journalInput(value));
+console.log('PASS: journal minor-unit precision, balancing including totals beyond safe-number range, bounds, dimensions, explicit approval and authority-field exclusion');

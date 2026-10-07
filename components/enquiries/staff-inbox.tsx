@@ -1,0 +1,11 @@
+'use client';
+import {StaffCollaboration,type StaffMember,type Assignment} from './staff-collaboration';
+import {useState} from 'react';
+import {useRouter} from 'next/navigation';
+type Enquiry={id:string;contact_name:string;contact_email:string;phone:string;message:string;status:string;created_at:string;listing_id:string|null;realtor_id:string|null};
+export function StaffInbox({enquiries,staff,assignments}:{enquiries:Enquiry[];staff:StaffMember[];assignments:Assignment[]}){
+ const router=useRouter();const [busy,setBusy]=useState('');const [message,setMessage]=useState('');
+ async function update(id:string,status:string){setBusy(id);setMessage('');try{const response=await fetch('/api/staff/enquiries',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Unable to update.');router.refresh();setMessage('Enquiry status updated and recorded in its history.');}catch(error){setMessage(error instanceof Error?error.message:'Unable to update. Please retry.');}finally{setBusy('');}}
+ const filtered=enquiries;
+ return <><p role="status">{message}</p><div className="enquiry-grid">{filtered.map(row=><article className="staff-editor" key={row.id}><p className="eyebrow">{row.status} · {new Date(row.created_at).toLocaleDateString('en-JM',{timeZone:'America/Jamaica'})}</p><h2>{row.contact_name}</h2><p><a href={`mailto:${encodeURIComponent(row.contact_email)}`}>{row.contact_email}</a>{row.phone&&` · ${row.phone}`}</p><p className="enquiry-message">{row.message}</p><small>Reference: {row.id}</small>{row.listing_id&&<a href={`/listings/${row.listing_id}`}>View published property ↗</a>}<label>Update status<select value={row.status} disabled={busy===row.id} onChange={e=>update(row.id,e.target.value)}><option value="new">New</option><option value="contacted">Contacted</option><option value="closed">Closed</option></select></label><StaffCollaboration key={`${row.id}-${assignments.find(item=>item.enquiry_id===row.id)?.version||0}`} id={row.id} staff={staff} assignment={assignments.find(item=>item.enquiry_id===row.id)}/></article>)}{!filtered.length&&<div className="empty-state"><h2>No enquiries in this view.</h2><p>Stored property and realtor introduction requests appear here.</p></div>}</div></>;
+}

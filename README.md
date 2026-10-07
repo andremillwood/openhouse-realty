@@ -28,11 +28,13 @@ The marketplace has two complementary discovery modes:
 4. Install dependencies with `npm install`.
 5. Run `npm run dev`.
 
+See [service setup](docs/SERVICE-SETUP.md) for the linked Vercel project, Supabase migration workflow, and Resend configuration.
+
 ## Database
 
 The initial secure schema is in:
 
-`supabase/migrations/20261005100000_marketplace_foundation.sql`
+`supabase/migrations/20261006143920_marketplace_foundation.sql`
 
 All exposed tables must use Row Level Security. Do not add client-side-only authorization.
 
@@ -57,3 +59,17 @@ See:
 Never commit credentials, private keys, resident records, application documents, or production data.
 
 The Supabase secret/service key must remain server-only. Any variable prefixed with `NEXT_PUBLIC_` is shipped to the browser.
+
+## Client demo
+
+Open `/demo` to choose one of nine fictional profiles and navigate the role-based workspace without a password. Use **Start guided walkthrough**, **Explore as**, and **Reset demo** to explore cross-role workflows. Actions are session-local simulations and do not change production records or move money.
+
+See [demo guide](docs/DEMO-GUIDE.md) for the presentation sequence and [delivery status](docs/DELIVERY-STATUS.md) for the production backlog. Run `npm run test:demo` to verify workflow transitions and session restoration.
+
+## Production development
+
+The dependency-ordered execution plan is in `docs/PRODUCTION-DEVELOPMENT-PLAN.md`; evidence and remaining launch work are in `docs/DELIVERY-STATUS.md`.
+
+Public `/`, `/listings` and `/realtors` read approved published Supabase data. Illustrative experiences are available under `/demo/marketplace`, `/demo/listings` and `/demo/realtors`. Verified prospects can save properties and submit stored enquiries; catalog staff and enquiry staff require database-assigned organization membership. Background email activation still requires protected worker credentials and scheduling.
+
+Focused checks: `npm run test:catalog`, `npm run test:discovery`, `npm run test:notifications`, and `npm run test:demo`. Transactional database enquiry checks live in `scripts/sql/verify-enquiries.sql` and roll back their fixtures.

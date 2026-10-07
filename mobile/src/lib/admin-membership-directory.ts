@@ -1,0 +1,9 @@
+import type {SupabaseClient} from '@supabase/supabase-js';
+import {managerAccess} from './manager-access';
+import {validId} from './catalog';
+export async function adminMembershipDirectory(client:SupabaseClient,owner:string,pageInput:number){
+ const access=await managerAccess(client,owner);if(!access||access.role!=='admin')throw Error('Approved administrator membership required.');const requested=Math.max(1,Number.isSafeInteger(pageInput)?Math.min(pageInput,2147483647):1),response=await client.rpc('staff_membership_directory',{p_page:requested}),r=response.data;
+ if(response.error||!r||!Number.isSafeInteger(r.total)||r.total<0||!Number.isSafeInteger(r.pages)||r.pages!==Math.max(1,Math.ceil(r.total/25))||!Number.isSafeInteger(r.page)||r.page!==Math.min(requested,r.pages)||!Array.isArray(r.rows)||r.rows.length>25||r.rows.length>r.total)throw Error('Staff directory unavailable.');
+ const rows:{user:string;email:string;verified:boolean;role:string;revision:string}[]=r.rows.map((v:{user_id:unknown;email:unknown;verified:unknown;role:unknown;membership_revision:unknown})=>{if(!validId(v.user_id)||!validId(v.membership_revision)||typeof v.email!=='string'||v.email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)||typeof v.verified!=='boolean'||typeof v.role!=='string'||!['admin','manager','finance','realtor'].includes(v.role))throw Error('Invalid staff member.');return {user:v.user_id as string,email:v.email,verified:v.verified,role:v.role,revision:v.membership_revision as string};});if(new Set(rows.map((v:{user:string})=>v.user)).size!==rows.length)throw Error('Duplicate staff members.');
+ const current=await managerAccess(client,owner);if(!current||current.organization!==access.organization||current.role!==access.role||current.revision!==access.revision)throw Error('Administrator membership changed.');return {total:r.total as number,pages:r.pages as number,page:r.page as number,rows};
+}

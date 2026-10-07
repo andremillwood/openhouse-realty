@@ -1,0 +1,20 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+const id='44556600-0000-4000-8000-000000000001',work='44556600-0000-4000-8000-000000000002';
+async function run(input={},options={}){
+ const calls=[],client={from(table){let head=false;const q={select(fields,args){head=!!args?.head;return q},eq(...args){calls.push([table,'eq',...args]);return q},order(...args){calls.push([table,'order',...args]);return q},maybeSingle(){return Promise.resolve({data:options.missing?null:{id,title:'Approved inspection'},error:options.parentError})},range(...args){calls.push([table,'range',...args]);return Promise.resolve({data:options.empty?[]:table==='preventive_maintenance_events'?[{id,action:options.skip?'skip':'issue',version:2,reason:'Approved work scope',actor_user_id:id,created_at:'2026-10-07T10:00:00Z',work_order_id:options.skip?null:work,snapshot:{before:{next_due_on:'2026-10-07',title:'Approved inspection'}}}]:[{due_on:'2026-10-07',work_order_id:work,snapshot:{title:'Approved inspection'}}],error:options.rowError})},then(resolve,reject){assert(head);return Promise.resolve({count:options.count??61,error:options.countError}).then(resolve,reject)}};return q}};
+ const module={exports:{}},req=name=>name==='next/navigation'?{redirect(url){throw {redirect:url}},notFound(){throw {notFound:true}}}:name==='@/lib/staff/access'?{catalogAccess:async roles=>{assert.deepEqual(roles,['admin','manager']);return {client,user:options.denied?null:{id},membership:options.noMembership?null:{organization_id:'own'}}}}:name==='@/components/discovery/site-header'?{SiteHeader:()=>null}:require(name);
+ new Function('require','exports','module',ts.transpileModule(fs.readFileSync('app/staff/preventive-plans/[planId]/history/page.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText)(req,module.exports,module);
+ let html,error;try{html=renderToStaticMarkup(await module.exports.default({params:Promise.resolve({planId:options.id||id}),searchParams:Promise.resolve(input)}))}catch(e){error=e}return {calls,html,error};
+}
+(async()=>{
+ let r=await run({page:'2',occurrences:'3'});assert(!r.error);assert.deepEqual(r.calls.filter(c=>c[1]==='range'),[['preventive_maintenance_events','range',25,49],['preventive_maintenance_occurrences','range',50,74]]);
+ for(const table of ['preventive_maintenance_events','preventive_maintenance_occurrences'])for(const [key,value] of [['organization_id','own'],['plan_id',id]])assert.equal(r.calls.filter(c=>c[0]===table&&c[1]==='eq'&&c[2]===key&&c[3]===value).length,2);
+ assert.match(r.html,new RegExp('/staff/work-orders/'+work));assert.match(r.html,/Approved occurrence scope|Approved before\/after scope/);assert.match(r.html,/page=2&amp;occurrences=2/);assert.match(r.html,/page=3&amp;occurrences=3/);
+ r=await run({},{skip:true});assert.match(r.html,/Skipped scheduled date: 2026-10-07/);assert.match(r.html,/No work order was created and maintenance was not recorded as completed/);
+ r=await run({page:'99',occurrences:'99'},{count:0});assert.equal(r.error.redirect,`/staff/preventive-plans/${id}/history?page=1&occurrences=1`);assert(!r.calls.some(c=>c[1]==='range'));
+ r=await run({},{empty:true,count:0});assert.match(r.html,/No issued occurrences/);assert.match(r.html,/No recorded decisions/);
+ for(const option of ['countError','parentError','rowError']){r=await run({},{[option]:{message:'offline'}});assert(r.error instanceof Error);if(option!=='rowError')assert(!r.calls.some(c=>c[1]==='range'))}
+ for(const options of [{missing:true},{noMembership:true},{id:'bad'}]){r=await run({},options);assert(r.error.notFound);assert(!r.calls.some(c=>c[0]==='preventive_maintenance_events'))}
+ r=await run({},{denied:true});assert.equal(r.error.redirect,'/sign-in');assert.equal(r.calls.length,0);
+ console.log('PASS: preventive history management/parent scope, independent count-first pagination, work links, approved snapshots and fail-closed reads');
+})().catch(e=>{console.error(e);process.exitCode=1});

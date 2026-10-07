@@ -1,0 +1,11 @@
+import {useEffect,useRef,useState} from 'react';
+import {Pressable,Text,View} from 'react-native';
+import {withdrawApplicationDocument} from '../lib/application-documents';
+import {supabase} from '../lib/supabase';
+import {styles} from './styles';
+export function DocumentWithdraw({owner,application,id,onRefresh}:{owner:string;application:string;id:string;onRefresh:()=>void}){
+ const [confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[uncertain,setUncertain]=useState(false),[done,setDone]=useState(false),[message,setMessage]=useState('');const active=useRef(false),mounted=useRef(true),complete=useRef(false);
+ useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+ async function withdraw(){if(active.current||complete.current||!mounted.current||!supabase)return;active.current=true;setBusy(true);try{await withdrawApplicationDocument(supabase,owner,application,id);if(!mounted.current)return;complete.current=true;setDone(true);setUncertain(false);setMessage('This document is withdrawn from application review.');}catch{if(mounted.current){setUncertain(true);setMessage('Withdrawal could not be confirmed. Retry withdrawal of this same document or refresh its current state.');}}finally{active.current=false;if(mounted.current)setBusy(false);}}
+ return <View style={{gap:12}}>{!done&&<>{!confirm?<Pressable accessibilityRole="button" onPress={()=>setConfirm(true)}><Text style={styles.link}>Withdraw this document</Text></Pressable>:<><Text style={styles.body}>Remove this document from active application review? This does not promise immediate file deletion.</Text><Pressable accessibilityRole="button" disabled={busy} onPress={()=>void withdraw()}><Text style={styles.link}>{busy?'Confirming…':uncertain?'Retry same document withdrawal':'Confirm document withdrawal'}</Text></Pressable>{!busy&&!uncertain&&<Pressable accessibilityRole="button" onPress={()=>setConfirm(false)}><Text style={styles.link}>Keep document</Text></Pressable>}</>}</>}{!!message&&<Text accessibilityRole={uncertain?'alert':'text'} style={styles.body}>{message}</Text>}{(done||uncertain)&&<Pressable accessibilityRole="button" disabled={busy} onPress={onRefresh}><Text style={styles.link}>Refresh document records</Text></Pressable>}</View>;
+}

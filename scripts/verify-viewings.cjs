@@ -1,0 +1,17 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict');
+const moduleObject={exports:{}};const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+new Function('require','exports','module',ts.transpileModule(fs.readFileSync('lib/viewings/validation.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(name=>{assert.equal(name,'@/lib/enquiries/validation');return{uuidPattern};},moduleObject.exports,moduleObject);
+const {viewingRequestInput,viewingTransitionInput,slotInput,jamaicaInputToIso}=moduleObject.exports;
+const request={request_id:'33445566-0000-4000-8000-000000000015',slot_id:'33445566-0000-4000-8000-000000000010',contact_name:'Test Person',phone:'',consent:true,user_id:'spoof',contact_email:'spoof@example.invalid'};
+assert.equal(viewingRequestInput(request).p_contact_name,'Test Person');assert.equal(viewingRequestInput(request).user_id,undefined);
+for(const invalid of [{consent:false},{slot_id:'bad'},{request_id:'bad'},{contact_name:'X'},{phone:'x'.repeat(41)},{enquiry_id:'bad'}])assert.throws(()=>viewingRequestInput({...request,...invalid}));
+assert.throws(()=>viewingTransitionInput({viewing_id:request.slot_id,action:'cancel',reason:'no'}));
+assert.throws(()=>viewingTransitionInput({viewing_id:request.slot_id,action:'invented',reason:''}));
+const slot={action:'create',request_id:request.request_id,listing_id:request.slot_id,starts_at:'2026-10-10T09:00:00-05:00',ends_at:'2026-10-10T09:30:00-05:00'};
+assert.equal(slotInput(slot).p_starts_at,'2026-10-10T14:00:00.000Z');
+assert.throws(()=>slotInput({...slot,starts_at:'2026-10-10T09:00'}));
+assert.throws(()=>slotInput({...slot,ends_at:'2026-10-10T09:10:00-05:00'}));
+assert.throws(()=>slotInput({...slot,starts_at:'2026-02-30T09:00:00-05:00'}));
+assert.equal(jamaicaInputToIso('2026-10-10T09:00'),'2026-10-10T14:00:00.000Z');assert.throws(()=>jamaicaInputToIso('2026-02-30T09:00'));
+assert.equal(slotInput({action:'close',slot_id:request.slot_id}).p_action,'close');
+console.log('PASS: viewing consent/identity/target validation, cancellation reasons, duration bounds, explicit timezones and Jamaica calendar conversion');

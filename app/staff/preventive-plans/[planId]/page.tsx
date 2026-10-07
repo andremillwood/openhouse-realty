@@ -1,0 +1,14 @@
+import {notFound,redirect} from 'next/navigation';
+import {catalogAccess} from '@/lib/staff/access';
+import {SiteHeader} from '@/components/discovery/site-header';
+import {PreventivePlanEditor} from '@/components/staff/preventive-plan-editor';
+export const dynamic='force-dynamic';
+export default async function Plan({params}:{params:Promise<{planId:string}>}){
+ const {client,user,membership}=await catalogAccess(['admin','manager']);if(!user)redirect('/sign-in');if(!membership)notFound();const {planId}=await params;if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(planId))notFound();
+ const {data:plan,error}=await client.from('preventive_maintenance_plans').select('id,property_id,unit_id,title,description,priority,interval_days,next_due_on,state,version').eq('id',planId).eq('organization_id',membership.organization_id).maybeSingle();if(error)throw new Error('Unable to load preventive plan.');if(!plan)notFound();
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Jamaica',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ const due=plan.state==='active'&&plan.next_due_on<=today;
+ const scheduledDates=due?Math.floor((Date.parse(`${today}T00:00:00Z`)-Date.parse(`${plan.next_due_on}T00:00:00Z`))/(86400000*plan.interval_days))+1:0;
+ const afterIssue=new Date(Date.parse(`${plan.next_due_on}T00:00:00Z`)+plan.interval_days*86400000).toISOString().slice(0,10);
+ return <><SiteHeader/><main className="account-layout"><section className="account-card"><p className="eyebrow">Preventive maintenance · Revision {plan.version}</p><h1>{plan.title}</h1><p>{plan.state} · Next due {plan.next_due_on} · Every {plan.interval_days} days</p><p>{plan.description}</p><p>Property: {plan.property_id} · Unit: {plan.unit_id||'Common area'}</p>{due&&<aside aria-label="Due schedule review"><h2>{plan.next_due_on<today?'Overdue schedule':'Due today'}</h2><p>{scheduledDates} scheduled {scheduledDates===1?'date':'dates'} through today at the current fixed-day cadence. Each approval issues one work order for the next unissued date.</p><p>After issuance, the next due date will be {afterIssue}.{afterIssue<=today?' The plan will still be due. Review the remaining backlog before issuing additional work.':' The next scheduled date is in the future.'}</p><p>Pause or revise the schedule only with an approved management reason. A schedule revision does not record missed work as completed.</p></aside>}{plan.state!=='retired'&&<PreventivePlanEditor key={`edit-${plan.version}`} action="revise" plan={plan}/>} {due&&<PreventivePlanEditor key={`issue-${plan.version}`} action="issue" plan={plan}/>}{due&&<PreventivePlanEditor key={`skip-${plan.version}`} action="skip" plan={plan}/>}<p><a href={`/staff/preventive-plans/${plan.id}/history`}>Occurrence and decision history →</a></p><a href="/staff/preventive-plans">Preventive plan queue →</a></section></main></>;
+}

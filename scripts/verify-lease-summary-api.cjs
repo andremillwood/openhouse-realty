@@ -1,0 +1,21 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict');
+let user=null,membership=null,accessFailure=false,error=null,throwRpc=false,calls=[];
+const id='66117788-0000-4000-8000-000000000001';let data={id,draft_id:id,version:1,state:'released'};
+const client={rpc:async(name,args)=>{calls.push({name,args});if(throwRpc)throw Error('private transport');return {data,error}}};const cache={};
+function load(path){if(cache[path])return cache[path];const m={exports:{}};new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(name=>name==='next/server'?{NextResponse:{json:(body,options)=>new Response(JSON.stringify(body),options)}}:name==='@/lib/staff/access'?{catalogAccess:async roles=>{assert.deepEqual(roles,['admin','realtor','manager']);if(accessFailure)throw Error('private auth');return {client,user,membership}}}:name.startsWith('@/lib/')?load(name.slice(2)+'.ts'):require(name),m.exports,m);return cache[path]=m.exports;}
+const {POST}=load('app/api/staff/lease-summaries/route.ts'),{applicantLeaseSummaryResult,leaseSummaryMoney}=load('lib/leases/summary.ts');
+const body={application_id:id,draft_id:id,request_id:id,version:1,release_reference:'Approved shared summary',sharing_approved:true,organization_id:'spoof',released_by:'spoof',state:'signed',rent_minor:'1'};
+const request=(value=body,origin='http://127.0.0.1:3001',type='application/json')=>new Request('http://localhost:3001/api/staff/lease-summaries',{method:'POST',headers:{host:'127.0.0.1:3001',origin,'Content-Type':type},body:JSON.stringify(value)});
+async function check(status,value=body,origin,type){const r=await POST(request(value,origin,type));assert.equal(r.status,status);assert.equal(r.headers.get('Cache-Control'),'private, no-store');const result=await r.json();assert(!JSON.stringify(result).includes('private'));return result;}
+(async()=>{
+ await check(401);await check(403,body,'https://foreign.example');await check(415,body,undefined,'text/plain');user={id};await check(403);membership={organization_id:id,role:'manager'};
+ const result=await check(200);assert.deepEqual(result,data);assert.deepEqual(calls.at(-1),{name:'release_rental_lease_summary',args:{p_application_id:id,p_draft_id:id,p_request_id:id,p_expected_version:1,p_release_reference:body.release_reference,p_sharing_approved:true}});
+ const n=calls.length;await check(413,{...body,extra:'x'.repeat(4000)});for(const change of [{sharing_approved:false},{version:0},{version:1.5},{request_id:'bad'},{release_reference:'   '}])await check(400,{...body,...change});assert.equal(calls.length,n);
+ for(const [code,status] of [['42501',403],['40001',409],['23505',409],['40P01',409],['22023',400],['XX000',503]]){error={code,message:'private database'};await check(status);}error=null;
+ for(const invalid of [null,{...data,id:'bad'},{...data,draft_id:'foreign'},{...data,version:2},{...data,state:'signed'}]){data=invalid;await check(503);}throwRpc=true;await check(503);throwRpc=false;accessFailure=true;await check(503);
+ const item={id,version:2,state:'prepared',starts_on:'2026-10-08',ends_on:'2027-10-08',billing_day:31,rent_minor:'99999999999999',deposit_minor:'0',property_name:'Managed home',unit_label:'Unit A',template_title:'Residential template',released_at:'2026-10-07T13:00:00Z'};
+ assert.equal(applicantLeaseSummaryResult({total:1,items:[item]}).items[0].rent_minor,item.rent_minor);assert.equal(leaseSummaryMoney('10000010'),'JMD 100,000.10');assert.equal(leaseSummaryMoney('0'),'JMD 0.00');
+ for(const change of [{state:'signed'},{rent_minor:10000010},{deposit_minor:'-1'},{starts_on:'2026-02-30'},{ends_on:'2026-10-08'},{version:0},{billing_day:32},{released_at:'bad'}])assert.throws(()=>applicantLeaseSummaryResult({total:1,items:[{...item,...change}]}));
+ for(const bad of [{total:NaN,items:[]},{total:-1,items:[]},{total:0,items:[item]},{total:2,items:[item,item]},{total:2,items:[{...item,version:1},item]}])assert.throws(()=>applicantLeaseSummaryResult(bad));
+ console.log('PASS: lease summary release role/origin/body/approval gates, authority exclusion, safe uncertain/conflict errors, UUID/version confirmation and exact bounded applicant terms validation');
+})().catch(error=>{console.error(error);process.exitCode=1});

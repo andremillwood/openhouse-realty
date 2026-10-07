@@ -1,0 +1,15 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+function compile(path){return ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText}
+const vm={exports:{}};new Function('exports','module',compile('lib/finance/invoice-validation.ts'))(vm.exports,vm);
+const money={exports:{}};new Function('exports','module',compile('lib/finance/money.ts'))(money.exports,money);
+function load(hooks){const m={exports:{}};new Function('require','exports','module',compile('components/finance/invoice-review.tsx'))(name=>name==='react'&&hooks?hooks:name==='@/lib/finance/invoice-validation'?vm.exports:name==='@/lib/finance/money'?money.exports:require(name),m.exports,m);return m.exports.InvoiceReview}
+const id='44556600-0000-4000-8000-000000000020',props={invoiceId:id,version:2,actions:['approve','reject']};
+(async()=>{const original={fetch:global.fetch,FormData:global.FormData,window:global.window};let mode='network',reloads=0;const requests=[],messages=[],retry={current:null};try{
+ global.FormData=class{constructor(form){this.form=form}get(name){return this.form[name]}};global.window={location:{reload(){reloads++}}};global.fetch=async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});if(mode==='network')throw Error('Connection lost');return {ok:mode==='success',status:mode==='conflict'?409:503,json:async()=>({id,error:'Refresh invoice'})}};
+ const Editor=load({...React,useState:()=>[false,v=>messages.push(v)],useRef:()=>retry}),form={action:'approve',reason:'Approved independent decision',approved:null},event={preventDefault(){},currentTarget:form},submit=Editor(props).props.onSubmit;
+ await submit(event);assert.equal(requests.length,0);form.approved='on';form.action='review';await submit(event);assert.equal(requests.length,0);form.action='approve';
+ await submit(event);await submit(event);assert.equal(requests[0].body.request_id,requests[1].body.request_id);assert.equal(requests[0].body.invoice_id,id);assert.equal(requests[0].body.version,2);assert.equal(requests[0].body.amount_minor,null);assert.equal(requests[0].body.property_id,null);assert.equal(requests[0].url,'/api/staff/invoices');
+ mode='server';await submit(event);assert.equal(requests[2].body.request_id,requests[0].body.request_id);mode='conflict';await submit(event);assert.equal(retry.current,null);assert(messages.includes('Refresh invoice'));mode='success';await submit(event);assert.notEqual(requests[4].body.request_id,requests[0].body.request_id);assert.equal(reloads,1);
+ form.action='reject';await submit(event);assert.notEqual(requests[5].body.request_id,requests[4].body.request_id);assert.equal(requests[5].body.action,'reject');
+ console.log('PASS: invoice review explicit approval/action guards, immutable current revision payload, network/server retries, conflicts and successful refresh');
+ }finally{Object.assign(global,original)}})().catch(e=>{console.error(e);process.exitCode=1});

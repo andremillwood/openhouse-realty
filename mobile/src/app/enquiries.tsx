@@ -1,0 +1,19 @@
+import {useCallback} from 'react';
+import {ActivityIndicator,FlatList,Pressable,Text,View} from 'react-native';
+import {Link,router,useLocalSearchParams} from 'expo-router';
+import {useIdentity} from '../components/identity';
+import {useLoad} from '../components/use-load';
+import {styles} from '../components/styles';
+import {catalogQuery} from '../lib/catalog';
+import {ownedEnquiries} from '../lib/enquiries';
+import {supabase} from '../lib/supabase';
+export default function Enquiries(){
+ const {user,loading,error,refresh}=useIdentity();const page=catalogQuery(useLocalSearchParams<Record<string,string|string[]>>()).page;
+ if(loading)return <View style={styles.page}><ActivityIndicator accessibilityLabel="Checking your account"/></View>;
+ if(!user)return <View style={styles.page}><Text style={styles.title}>Your enquiries.</Text><Text style={styles.body}>{error||'Sign in with your verified account to check stored enquiries.'}</Text><Link href="/sign-in" style={styles.link}>Sign in →</Link>{!!error&&<Pressable accessibilityRole="button" onPress={()=>void refresh()}><Text style={styles.link}>Check account again</Text></Pressable>}</View>;
+ return <EnquiryHistory key={user.id+':'+page} owner={user.id} page={page}/>;
+}
+function EnquiryHistory({owner,page}:{owner:string;page:number}){
+ const loader=useCallback(()=>{if(!supabase)throw new Error('Connection unavailable');return ownedEnquiries(supabase,owner,page);},[owner,page]);const result=useLoad(owner+':'+page,loader);
+ return <FlatList contentContainerStyle={styles.page} data={result.data?.rows||[]} keyExtractor={row=>row.id} ItemSeparatorComponent={()=><View style={{height:18}}/>} renderItem={({item})=><View style={styles.card}><Text style={styles.heading}>{item.status==='new'?'Awaiting team follow-up':item.status==='contacted'?'The team is following up':'Enquiry closed'}</Text><Text style={styles.body}>{item.listing_id?'Property enquiry':'Realtor introduction'} · {new Date(item.created_at).toLocaleString('en-JM',{timeZone:'America/Jamaica'})}</Text><Text style={styles.body}>{item.message}</Text><Text selectable style={styles.body}>Reference: {item.id}</Text>{item.listing_id&&<Link href={{pathname:'/listings/[id]',params:{id:item.listing_id}}} style={styles.link}>View published property →</Link>}</View>} ListHeaderComponent={<View style={{gap:18}}><Text style={styles.title}>Your enquiries.</Text><Text style={styles.body}>Check stored submissions before sending another enquiry after an interrupted connection. A stored enquiry does not confirm a viewing.</Text>{result.loading?<ActivityIndicator accessibilityLabel="Loading enquiries"/>:result.error?<><Text accessibilityRole="alert" style={styles.body}>Unable to load your enquiries.</Text><Pressable accessibilityRole="button" onPress={result.retry}><Text style={styles.link}>Try again</Text></Pressable></>:result.data&&<><Text style={styles.body}>{result.data.total} enquiries · Page {result.data.page} of {result.data.pages}</Text>{result.data.total===0?<Text style={styles.body}>No stored enquiries for this account.</Text>:result.data.rows.length===0&&<Text style={styles.body}>Your enquiries changed while loading. Refresh to see the current records.</Text>}</>}</View>} ListFooterComponent={result.data&&<View style={{gap:18,paddingTop:24}}><View style={{flexDirection:'row',justifyContent:'space-between'}}><Pressable accessibilityRole="button" disabled={result.data.page===1} onPress={()=>router.setParams({page:String(result.data!.page-1)})}><Text style={styles.link}>← Previous</Text></Pressable><Pressable accessibilityRole="button" disabled={result.data.page===result.data.pages} onPress={()=>router.setParams({page:String(result.data!.page+1)})}><Text style={styles.link}>Next →</Text></Pressable></View><Pressable accessibilityRole="button" onPress={result.retry}><Text style={styles.link}>Refresh enquiries</Text></Pressable></View>}/>;
+}

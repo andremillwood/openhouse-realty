@@ -1,0 +1,10 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict');
+const m={exports:{}};new Function('exports','module',ts.transpileModule(fs.readFileSync('mobile/src/lib/invitation-link.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(m.exports,m);
+const rewrite=m.exports.invitationLink,id='AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA',route='/account/invitations/'+id,target='/team-invitation?id='+id.toLowerCase();
+for(const path of [route,'openhouse-realty://account/invitations/'+id,'openhouse-realty:///account/invitations/'+id,'https://approved.example'+route])assert.equal(rewrite(path,'https://approved.example'),target);
+for(const path of [route+'?id=other',route+'#other',route+'/',route.replace(id,'bad'),'https://foreign.example'+route,'https://user@approved.example'+route,'http://approved.example'+route,'//approved.example'+route,'openhouse-realty://auth/confirm?code=secret','/auth/recover?code=secret','%broken','https://approved.example/account/invitations/%2e%2e'])assert.equal(rewrite(path,'https://approved.example'),path);
+assert.equal(rewrite('https://approved.example'+route), 'https://approved.example'+route);
+const wrapper={exports:{}};new Function('require','exports','module',ts.transpileModule(fs.readFileSync('mobile/src/app/+native-intent.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(()=>m.exports,wrapper.exports,wrapper);
+assert.equal(wrapper.exports.redirectSystemPath({path:route,initial:true}),target);
+assert.equal(wrapper.exports.redirectSystemPath({path:route,initial:false}),target);
+console.log('PASS: exact invitation links, approved HTTPS origin, custom scheme, malformed/foreign links and auth callback preservation');

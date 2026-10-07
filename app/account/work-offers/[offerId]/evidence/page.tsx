@@ -1,0 +1,30 @@
+import {notFound, redirect} from 'next/navigation';
+import {createClient} from '@/lib/supabase/server';
+import {SiteHeader} from '@/components/discovery/site-header';
+import {EvidenceFiles} from '@/components/staff/evidence-files';
+export const dynamic = 'force-dynamic';
+export default async function Evidence({params, searchParams}: {params: Promise<{offerId: string}>; searchParams: Promise<Record<string, string | string[] | undefined>>}) {
+  const client = await createClient(), {data: {user}, error} = await client.auth.getUser();
+  if (error || !user?.email_confirmed_at) redirect('/sign-in');
+  const {offerId} = await params, input = await searchParams;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(offerId)) notFound();
+  const registrations = await client.from('contractor_accounts').select('id').eq('user_id', user.id).eq('is_active', true);
+  if (registrations.error) throw new Error('Unable to load contractor access.');
+  const ids = (registrations.data || []).map(row => row.id); if (!ids.length) notFound();
+  const current = await client.from('contractor_work_offers').select('id,job_title,state,version').eq('id', offerId).in('contractor_id', ids).maybeSingle();
+  if (current.error) throw new Error('Unable to load assignment.'); if (!current.data) notFound();
+  const offer = current.data;
+  const pending = await client.from('contractor_completion_reports').select('id').eq('offer_id', offerId).eq('contractor_user_id', user.id).eq('state', 'submitted').maybeSingle();
+  if (pending.error) throw new Error('Unable to check pending completion review.');
+  const presence = offer.state === 'accepted' ? await client.from('contractor_presence').select('state,contractor_visits!inner(offer_id)').eq('contractor_user_id', user.id).eq('contractor_visits.offer_id', offerId).order('checked_in_at', {ascending: false}).order('id').limit(1) : null;
+  if (presence?.error) throw new Error('Unable to check departure.');
+  const page = typeof input.page === 'string' && /^\d{1,5}$/.test(input.page) ? Math.max(1, Number(input.page)) : 1;
+  const base = `/account/work-offers/${offerId}/evidence`, href = (next: number) => `${base}?page=${next}`;
+  const query = (head = false) => client.from('contractor_evidence').select('id,file_name,state,expires_at,contractor_report_evidence(report_id)', {head, count: 'exact'}).eq('offer_id', offerId).eq('user_id', user.id).in('state', ['reserved','uploaded']);
+  const count = await query(true); if (count.error) throw new Error('Unable to count evidence files.');
+  const pages = Math.max(1, Math.ceil((count.count || 0)/25)); if (page > pages) redirect(href(pages));
+  const rows = await query().order('created_at', {ascending: false}).order('id').range((page-1)*25, page*25-1).limit(1, {referencedTable: 'contractor_report_evidence'});
+  const editable = offer.state === 'accepted' && !pending.data && !!presence?.data?.length;
+  const enabled = !!process.env.SUPABASE_SECRET_KEY && process.env.SUPABASE_SECRET_KEY.length >= 30 && !process.env.SUPABASE_SECRET_KEY.includes('YOUR-');
+  return <><SiteHeader/><main className="account-layout"><section className="account-card"><p className="eyebrow">Contractor evidence</p><h1>{offer.job_title}</h1>{pending.data && <p>Your report is awaiting review. Its evidence stays fixed.</p>}{rows.error ? <p role="alert">Unable to load files. Please refresh.</p> : <EvidenceFiles offerId={offerId} editable={editable} enabled={enabled} files={(rows.data || []).map(file => ({id: file.id, file_name: file.file_name, state: file.state, expires_at: file.expires_at, frozen: !!file.contractor_report_evidence?.length}))}/>}<nav className="results-toolbar" aria-label="Evidence file pages">{page > 1 ? <a href={href(page-1)}>← Previous</a> : <span/>}<span>{count.count || 0} files · Page {page} of {pages}</span>{page < pages ? <a href={href(page+1)}>Next →</a> : <span/>}</nav><p><a href={`/account/work-offers/${offerId}/completion`}>Completion reports and feedback</a></p><a href={`/account/work-offers/${offerId}`}>Back to assignment</a></section></main></>;
+}

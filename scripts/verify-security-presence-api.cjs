@@ -1,0 +1,19 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict');let user=null,membership=null,error=null,calls=[],rolesSeen=[];const client={rpc:async(name,args)=>{calls.push({name,args});return {data:{property_id:'created',revision:1},error}}};const cache={};function load(path){if(cache[path])return cache[path];const module={exports:{}};const req=name=>{if(name==='next/server')return {NextResponse:{json:(body,options)=>new Response(JSON.stringify(body),options)}};if(name==='@/lib/supabase/server')return {createClient:async()=>({...client,auth:{getUser:async()=>({data:{user},error:null})}})};if(name==='@/lib/staff/access')return {catalogAccess:async roles=>{rolesSeen=roles;return {client,user,membership}}};if(name.startsWith('@/lib/'))return load(name.slice(2)+'.ts');throw Error(name);};new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(req,module.exports,module);cache[path]=module.exports;return module.exports;}
+
+const {POST}=load('app/api/security/presence/route.ts'),{presenceInput}=load('lib/security/presence-validation.ts');
+const id='55667788-0000-4000-8000-000000000001';
+const arrival={request_id:id,action:'check_in',permit_id:id,version:0,identity_checked:true,reason:'Identity checked at gate',actor_id:'spoof',organization_id:'spoof',checked_in_at:'spoof'};
+const departure={request_id:id,action:'check_out',presence_id:id,version:1,reason:'Contractor left property'};
+function request(body,origin='http://127.0.0.1:3001',type='application/json'){return new Request('http://localhost:3001/api/security/presence',{method:'POST',headers:{host:'127.0.0.1:3001',origin,'Content-Type':type},body:JSON.stringify(body)});}
+(async()=>{
+for(const patch of [{request_id:'bad'},{action:'override'},{permit_id:'bad'},{presence_id:id},{identity_checked:false},{version:1},{reason:'tiny'}])assert.throws(()=>presenceInput({...arrival,...patch}));
+for(const patch of [{presence_id:'bad'},{permit_id:id},{identity_checked:true},{version:0},{version:2147483647},{version:1.5}])assert.throws(()=>presenceInput({...departure,...patch}));
+assert.equal((await POST(request(arrival))).status,401);user={id};assert.equal((await POST(request(arrival))).status,401);user={id,email_confirmed_at:'2026-10-07T00:00:00Z'};
+assert.equal((await POST(request(arrival,'https://foreign.example'))).status,403);assert.equal((await POST(request(arrival,undefined,'text/plain'))).status,415);
+let response=await POST(request(arrival));assert.equal(response.status,200);assert.equal(response.headers.get('Cache-Control'),'private, no-store');assert.deepEqual(calls.at(-1),{name:'record_contractor_presence',args:{p_request_id:id,p_action:'check_in',p_permit_id:id,p_presence_id:null,p_expected_version:0,p_identity_checked:true,p_reason:arrival.reason}});
+response=await POST(request(departure));assert.equal(response.status,200);assert.equal(calls.at(-1).args.p_permit_id,null);assert.equal(calls.at(-1).args.p_identity_checked,null);
+for(const [code,status] of [['42501',403],['40001',409],['40P01',409],['23505',409],['22023',400]]){error={code,message:'Internal details'};response=await POST(request(arrival));assert.equal(response.status,status);assert.doesNotMatch(JSON.stringify(await response.json()),/Internal details/);}
+error=null;assert.equal((await POST(request({...arrival,reason:'x'.repeat(6000)}))).status,413);
+const before=calls.length;assert.equal((await POST(request({...arrival,identity_checked:false}))).status,400);assert.equal(calls.length,before);
+console.log('PASS: presence API verified account, origin/body guards, arrival identity, departure revision, authority-field stripping and safe conflicts');
+})().catch(e=>{console.error(e);process.exitCode=1});

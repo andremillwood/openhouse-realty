@@ -1,0 +1,13 @@
+import {notFound,redirect} from 'next/navigation';
+import {catalogAccess} from '@/lib/staff/access';
+import {SiteHeader} from '@/components/discovery/site-header';
+import {ChequeForm} from '@/components/finance/cheque-form';
+import {formatJmdMinor} from '@/lib/finance/money';
+export const dynamic='force-dynamic';
+export default async function Cheques({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}){
+ const {client,user,membership}=await catalogAccess(['admin','finance']);if(!user)redirect('/sign-in');if(!membership)notFound();
+ const input=await searchParams,page=typeof input.page==='string'&&/^\d{1,5}$/.test(input.page)?Math.max(1,Number(input.page)):1;
+ const count=await client.from('audited_cheque_receipts').select('id',{head:true,count:'exact'}).eq('organization_id',membership.organization_id);if(count.error)throw new Error('Unable to count cheque receipts.');const pages=Math.max(1,Math.ceil((count.count||0)/25));if(page>pages)redirect(`/staff/finance/cheques?page=${pages}`);
+ const rows=await client.from('audited_cheque_receipts').select('id,payer_name,bank_name,cheque_reference,amount_minor,state,version,received_at').eq('organization_id',membership.organization_id).order('received_at',{ascending:false}).order('id').range((page-1)*25,page*25-1);
+ return <><SiteHeader/><main className="account-layout"><section className="account-card"><p className="eyebrow">Finance custody</p><h1>Incoming cheques.</h1><p>Received details are fixed. Deposit, bank clearance, return evidence and controlled ledger posting are still being connected.</p><ChequeForm/>{rows.error?<p role="alert">Unable to load receipts. Please refresh.</p>:rows.data?.length?rows.data.map(row=><article className="staff-editor" key={`${row.id}-${row.version}`}><h2>{row.payer_name}</h2><p>{row.bank_name} · {row.cheque_reference}<br/>{formatJmdMinor(String(row.amount_minor))} · {row.state}</p><p>Received {new Date(row.received_at).toLocaleString('en-JM',{timeZone:'America/Jamaica'})} · Jamaica time</p><p><a href={`/staff/finance/cheques/${row.id}`}>Receipt and custody history →</a></p><small>Receipt: {row.id}</small>{row.state==='received'&&<ChequeForm receipt={row}/>}</article>):<p>No cheque receipts yet.</p>}<nav className="results-toolbar" aria-label="Cheque receipt pages">{page>1?<a href={`/staff/finance/cheques?page=${page-1}`}>← Previous</a>:<span/>}<span>{count.count||0} receipts · Page {page} of {pages}</span>{page<pages?<a href={`/staff/finance/cheques?page=${page+1}`}>Next →</a>:<span/>}</nav><a href="/account">Return to account →</a></section></main></>;
+}

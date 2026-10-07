@@ -1,0 +1,12 @@
+import type {SupabaseClient} from '@supabase/supabase-js';
+import {securityEntry} from './security-entry';
+import {validId} from './catalog';
+export async function securityPresenceHistory(client:SupabaseClient,owner:string,permit:string,pageInput:number){
+ const snapshot=await securityEntry(client,owner,permit);if(!snapshot.presence)throw new Error('Recorded presence required.');
+ const parent=await client.from('contractor_presence').select('id,property_id,permit_id').eq('id',snapshot.presence).eq('permit_id',permit).maybeSingle();const p=parent.data;if(parent.error||!p||p.id!==snapshot.presence||p.permit_id!==permit||!validId(p.property_id))throw new Error('Presence history unavailable.');
+ const query=(head=false)=>client.from('contractor_presence_changes').select('id,presence_id,property_id,actor_user_id,action,new_state,version,reason,created_at',{head,count:'exact'}).eq('presence_id',p.id).eq('property_id',p.property_id);
+ const count=await query(true);if(count.error||!Number.isSafeInteger(count.count)||count.count!<0)throw new Error('Presence events unavailable.');const total=count.count!,pages=Math.max(1,Math.ceil(total/25)),page=Math.min(Math.max(1,Number.isSafeInteger(pageInput)?pageInput:1),pages);
+ const response=total?await query().order('created_at',{ascending:false}).order('id',{ascending:true}).range((page-1)*25,page*25-1):{data:[],error:null};if(response.error||!Array.isArray(response.data)||response.data.length>25)throw new Error('Presence events unavailable.');
+ const rows=response.data.map(r=>{if(!validId(r.id)||r.presence_id!==p.id||r.property_id!==p.property_id||!validId(r.actor_user_id)||!['check_in','check_out'].includes(r.action)||r.new_state!==(r.action==='check_in'?'on_site':'exited')||!Number.isInteger(r.version)||r.version<1||r.version>=2147483647||typeof r.reason!=='string'||r.reason.trim().length<5||r.reason.length>500||typeof r.created_at!=='string'||!Number.isFinite(Date.parse(r.created_at)))throw new Error('Invalid presence event.');return {id:r.id as string,actor:r.actor_user_id as string,action:r.action as string,state:r.new_state as string,version:r.version as number,reason:r.reason as string,created:r.created_at as string};});if(new Set(rows.map(r=>r.id)).size!==rows.length)throw new Error('Invalid presence events.');
+ const current=await securityEntry(client,owner,permit);if(current.presence!==snapshot.presence)throw new Error('Security access changed.');return {snapshot:current,total,pages,page,rows};
+}

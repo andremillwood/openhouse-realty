@@ -1,0 +1,20 @@
+import {useCallback} from 'react';
+import {ActivityIndicator,FlatList,Pressable,Text,View} from 'react-native';
+import {Link,router,useLocalSearchParams} from 'expo-router';
+import {useIdentity} from '../../components/identity';
+import {useLoad} from '../../components/use-load';
+import {styles} from '../../components/styles';
+import {catalogQuery} from '../../lib/catalog';
+import {CosignerRevoke} from '../../components/cosigner-revoke';
+import {CosignerInviteControl} from '../../components/cosigner-invite';
+import {applicationCosigners} from '../../lib/application-cosigners';
+import {supabase} from '../../lib/supabase';
+export default function Invitations(){const params=useLocalSearchParams<Record<string,string|string[]>>(),id=typeof params.id==='string'?params.id:'invalid',page=catalogQuery(params).page;const {user,loading}=useIdentity();if(loading)return <View style={styles.page}><ActivityIndicator accessibilityLabel="Checking account"/></View>;if(!user)return <View style={styles.page}><Link href="/sign-in" style={styles.link}>Sign in to view your application invitations →</Link></View>;return <Detail key={user.id+id+page} owner={user.id} id={id} page={page}/>;}
+function Detail({owner,id,page}:{owner:string;id:string;page:number}){
+ const loader=useCallback(()=>{if(!supabase)throw Error();return applicationCosigners(supabase,owner,id,page);},[owner,id,page]);const result=useLoad(owner+id+page,loader);
+ if(result.loading)return <View style={styles.page}><ActivityIndicator accessibilityLabel="Loading co-signer invitations"/></View>;
+ if(result.error)return <View style={styles.page}><Text accessibilityRole="alert" style={styles.body}>Application invitations could not be loaded.</Text><Pressable accessibilityRole="button" onPress={result.retry}><Text style={styles.link}>Try again</Text></Pressable></View>;
+ if(!result.data)return <View style={styles.page}><Text style={styles.heading}>Invitations unavailable</Text></View>;
+ const data=result.data;
+ return <FlatList contentContainerStyle={styles.page} data={data.rows} keyExtractor={r=>r.id} ListHeaderComponent={<View style={{gap:18}}><Text style={styles.title}>Your co-signer invitations.</Text><CosignerInviteControl owner={owner} application={id} onRefresh={result.retry}/><Text style={styles.body}>Recorded invitations for this application. Review consent is separate from a signed lease or legal guarantee.</Text><Text style={styles.body}>{data.total} invitations · Page {data.page} of {data.pages}</Text>{!data.total&&<Text style={styles.body}>No co-signer invitations are recorded.</Text>}{!!data.total&&!data.rows.length&&<Text style={styles.body}>Invitations changed while loading. Refresh to check.</Text>}<Link href={{pathname:'/applications/[id]',params:{id}}} style={styles.link}>Application review →</Link></View>} renderItem={({item})=><View style={styles.card}><Text style={styles.heading}>{item.email}</Text><Text style={styles.body}>Recorded status: {item.state}</Text><Text style={styles.body}>Expires {new Date(item.expires).toLocaleString('en-JM',{timeZone:'America/Jamaica'})}</Text><Text style={styles.body}>Created {new Date(item.created).toLocaleString('en-JM',{timeZone:'America/Jamaica'})}</Text><Text selectable style={styles.body}>Invitation reference: {item.id}</Text>{['pending','accepted'].includes(item.state)&&<CosignerRevoke key={item.id+item.version} owner={owner} application={id} id={item.id} version={item.version} onRefresh={result.retry}/>}</View>} ListFooterComponent={<View style={{gap:18}}><Pressable accessibilityRole="button" disabled={data.page===1} onPress={()=>router.setParams({page:String(data.page-1)})}><Text style={styles.link}>← Newer</Text></Pressable><Pressable accessibilityRole="button" disabled={data.page===data.pages} onPress={()=>router.setParams({page:String(data.page+1)})}><Text style={styles.link}>Older →</Text></Pressable><Pressable accessibilityRole="button" onPress={result.retry}><Text style={styles.link}>Refresh invitations</Text></Pressable></View>}/>;
+}

@@ -1,0 +1,7 @@
+const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export function attendanceInput(value:unknown){
+ if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('Attendance details required.');const body=value as Record<string,unknown>;
+ if(typeof body.rsvp_id!=='string'||!uuid.test(body.rsvp_id)||typeof body.request_id!=='string'||!uuid.test(body.request_id)||!Number.isInteger(body.rsvp_version)||Number(body.rsvp_version)<1||Number(body.rsvp_version)>=2147483647||!Number.isInteger(body.attendance_version)||Number(body.attendance_version)<0||Number(body.attendance_version)>=2147483647||!['attended','no_show','unrecorded'].includes(String(body.state))||!Number.isInteger(body.attended_count)||Number(body.attended_count)<0||Number(body.attended_count)>6||typeof body.reason!=='string'||body.reason.trim().length<5||body.reason.trim().length>500)throw new Error('Check attendance state, count, revision and reason.');
+ if((body.state==='attended'&&Number(body.attended_count)<1)||(body.state!=='attended'&&body.attended_count!==0))throw new Error('Record an attending count, or zero for no-show or correction.');
+ return {p_rsvp_id:body.rsvp_id,p_request_id:body.request_id,p_rsvp_version:Number(body.rsvp_version),p_attendance_version:Number(body.attendance_version),p_state:String(body.state),p_attended_count:Number(body.attended_count),p_reason:body.reason.trim()};
+}

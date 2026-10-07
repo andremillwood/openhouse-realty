@@ -1,0 +1,10 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict'),cache={};function load(path){if(cache[path])return cache[path];const m={exports:{}};new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(name=>load('lib/notifications/'+name.replace('./','')+'.ts'),m.exports,m);return cache[path]=m.exports;}
+const {preparePreventiveNotifications}=load('lib/notifications/prepare-preventive.ts'),id='55667788-0000-4000-8000-000000000001';let rows=[],failure=null,result=id,calls=[];
+const client={rpc:async(name,args)=>{calls.push({name,args});return name==='pending_preventive_notifications'?{data:rows,error:failure}:{data:result,error:failure}}};
+(async()=>{
+ assert.deepEqual(await preparePreventiveNotifications(client),{queued:0,superseded:0});rows=[{event_id:id,kind:'date_skipped',plan_id:id,work_order_id:null}];calls=[];assert.deepEqual(await preparePreventiveNotifications(client),{queued:1,superseded:0});assert.equal(calls[1].name,'queue_preventive_notification');assert.deepEqual(Object.keys(calls[1].args),['p_event_id','p_subject','p_text']);assert.match(calls[1].args.p_text,/does not record maintenance as completed/);
+ result=null;assert.deepEqual(await preparePreventiveNotifications(client),{queued:0,superseded:1});result='bad';await assert.rejects(()=>preparePreventiveNotifications(client),/queue result/);
+ for(const invalid of [null,{},Array(21).fill(rows[0]),[rows[0],{...rows[0],event_id:'bad'}],[{...rows[0],kind:'unknown'}],[{...rows[0],kind:'work_issued'}]]){rows=invalid;calls=[];await assert.rejects(()=>preparePreventiveNotifications(client));assert.equal(calls.length,1)}
+ rows=[];failure={message:'private details'};await assert.rejects(()=>preparePreventiveNotifications(client),/preparation unavailable/);
+ console.log('PASS: bounded preventive preparation, whole-batch validation, canonical queue content, supersession and failed/uncertain results');
+})().catch(error=>{console.error(error);process.exitCode=1});

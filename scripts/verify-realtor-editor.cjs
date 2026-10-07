@@ -1,0 +1,8 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+const source=fs.readFileSync('components/staff/catalog-editor.tsx','utf8').replace('function EditorForm(','export function EditorForm('),moduleObject={exports:{}};
+new Function('require','exports','module',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText)(require,moduleObject.exports,moduleObject);
+const row={id:'55667788-0000-4000-8000-000000000001',display_name:'Approved Realtor',bio:'Approved professional biography.',service_areas:['Kingston','St Andrew'],supported_intents:['rent','buy'],communication_style:'direct',guidance_style:'data-led',decision_pace:'considered',is_published:true,authoring_revision:3};
+const html=renderToStaticMarkup(React.createElement(moduleObject.exports.EditorForm,{kind:'realtor',row}));
+assert.match(html,/name="reason"[^>]*required=""[^>]*minLength="5"[^>]*maxLength="500"/);assert.match(html,/name="approved"/);assert.doesNotMatch(html,/name="approved"[^>]*checked/);assert.match(html,/name="is_published"[^>]*checked/);assert.match(html,/Kingston, St Andrew/);assert.match(html,/maxLength="6050"/);assert.match(html,new RegExp(`/staff/realtors/${row.id}/history`));
+const workspace=renderToStaticMarkup(React.createElement(moduleObject.exports.CatalogEditor,{listings:[],realtors:[row],initialKind:'realtor'}));assert.match(workspace,/Create realtor profile/);
+console.log('PASS: realtor editor requires reason, fresh approval, preserves publication/content, supports service lists and links history');

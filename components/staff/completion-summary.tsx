@@ -1,0 +1,4 @@
+export type CompletionReport = {id: string; state: string; version: number; summary: string; tests_performed: string; outstanding_items: string; review_message: string | null; created_at: string};
+export function CompletionSummary({report}: {report: CompletionReport}) {
+  return <article className="staff-editor"><h2>{report.state.replaceAll('_', ' ')} · Revision {report.version}</h2><small>Submitted {new Date(report.created_at).toLocaleString('en-JM', {timeZone: 'America/Jamaica'})} (Jamaica time)</small><h3>Work performed</h3><p className="enquiry-message">{report.summary}</p><h3>Tests and results</h3><p className="enquiry-message">{report.tests_performed}</p><h3>Outstanding items</h3><p className="enquiry-message">{report.outstanding_items}</p>{report.review_message && <><h3>Management review</h3><p className="enquiry-message">{report.review_message}</p></>}</article>;
+}

@@ -1,0 +1,1 @@
+export default function NotFound(){return <main className="account-layout"><section className="account-card"><h1>A new direction.</h1><p>This page or published property is no longer available.</p><a href="/listings">Explore available properties ↗</a></section></main>;}

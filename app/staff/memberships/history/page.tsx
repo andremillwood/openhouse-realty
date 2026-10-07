@@ -1,0 +1,12 @@
+import {notFound,redirect} from 'next/navigation';
+import {catalogAccess} from '@/lib/staff/access';
+import {SiteHeader} from '@/components/discovery/site-header';
+export const dynamic='force-dynamic';
+export default async function MembershipHistory({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}){
+ const {client,user,membership}=await catalogAccess(['admin']);if(!user)redirect('/sign-in');if(!membership)notFound();const input=await searchParams;
+ const page=typeof input.page==='string'&&/^\d{1,5}$/.test(input.page)?Math.max(1,Number(input.page)):1;
+ const query=(head=false)=>client.from('staff_membership_changes').select('id,actor_user_id,target_user_id,target_email,previous_role,new_role,reason,created_at',{head,count:'exact'}).eq('organization_id',membership.organization_id);
+ const count=await query(true);if(count.error)throw new Error('Unable to count membership changes.');const pages=Math.max(1,Math.ceil((count.count||0)/25));if(page>pages)redirect(`/staff/memberships/history?page=${pages}`);
+ const rows=await query().order('created_at',{ascending:false}).order('id').range((page-1)*25,page*25-1);
+ return <><SiteHeader/><main className="account-layout"><section className="account-card"><p className="eyebrow">Private membership audit</p><h1>Staff access changes.</h1><p>Account emails are snapshots from the change. Immutable actor and account references preserve attribution.</p>{rows.error?<p role="alert">Unable to load changes. Please refresh.</p>:rows.data?.length?rows.data.map(row=><article className="staff-editor" key={row.id}><h2>{row.target_email}</h2><p>{row.previous_role||'No staff access'} → {row.new_role||'Access revoked'}</p><p>{new Date(row.created_at).toLocaleString('en-JM',{timeZone:'America/Jamaica'})} · Jamaica time</p><p className="enquiry-message">{row.reason}</p><small>Actor: {row.actor_user_id}<br/>Account: {row.target_user_id}</small></article>):<p>No audited membership changes yet. Trusted bootstrap assignments predate this history.</p>}<nav className="results-toolbar" aria-label="Membership history pages">{page>1?<a href={`/staff/memberships/history?page=${page-1}`}>← Previous</a>:<span/>}<span>{count.count||0} changes · Page {page} of {pages}</span>{page<pages?<a href={`/staff/memberships/history?page=${page+1}`}>Next →</a>:<span/>}</nav><a href="/staff/memberships">Back to staff access ↗</a></section></main></>;
+}
