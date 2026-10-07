@@ -801,7 +801,7 @@ export function DemoWorkspace({ initialRole }: { initialRole?: DemoRole }) {
             ))}
           </div>
           <div className="demo-hub-links">
-            <Link href="/demo/listings">Explore the property marketplace ↗</Link>
+            <Link href="/demo/listings">Explore the property marketplace ↗</Link><Link href="/demo/explore">Explore demo people &amp; workflows ↗</Link>
             <Link href="/demo/realtors">Try realtor matching ↗</Link>
             <button
               onClick={() => {
@@ -883,7 +883,7 @@ export function DemoWorkspace({ initialRole }: { initialRole?: DemoRole }) {
             ))}
           </nav>
           <div className="demo-explore-links">
-            <Link href="/demo/listings">Property marketplace ↗</Link>
+            <Link href="/demo/listings">Property marketplace ↗</Link><Link href="/demo/explore">All demo people &amp; workflows ↗</Link>
             <Link href="/demo/realtors">Realtor matching ↗</Link>
             <button onClick={() => setGuide(!guide)}>
               Guided walkthrough {guide ? "−" : "+"}
