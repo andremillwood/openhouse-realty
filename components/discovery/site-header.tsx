@@ -25,7 +25,7 @@ export function SiteHeader() {
         <a href="/realtors">Our realtors</a>
         <a href="/open-houses">Open houses</a>
         <a href="/sell">Sell</a>
-        <a href="/#manage">Services</a>
+        <a href="/services">Services</a>
         <a href="/inventory">Live properties</a>
         <a href="/demo">Demo</a>
         <a href="/account">My account</a>
