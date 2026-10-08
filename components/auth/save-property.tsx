@@ -1,4 +1,5 @@
 'use client';
+import {propertySignInHref} from '@/lib/auth-return';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 export function SaveProperty({ listingId, initialSaved = false }: { listingId: string; initialSaved?: boolean }) {
@@ -10,7 +11,7 @@ export function SaveProperty({ listingId, initialSaved = false }: { listingId: s
     try {
       const client = createClient();
       const { data: { user }, error: authError } = await client.auth.getUser();
-      if (authError || !user?.email_confirmed_at) { window.location.assign('/sign-in'); return; }
+      if (authError || !user?.email_confirmed_at) { window.location.assign(propertySignInHref(listingId)); return; }
       const { error } = saved
         ? await client.from('saved_listings').delete().eq('user_id', user.id).eq('listing_id', listingId)
         : await client.from('saved_listings').upsert({ user_id: user.id, listing_id: listingId }, { onConflict: 'user_id,listing_id', ignoreDuplicates: true });
