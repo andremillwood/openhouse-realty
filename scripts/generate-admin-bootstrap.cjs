@@ -10,7 +10,7 @@ begin
  if not exists(select 1 from public.organizations where id=${org}) then raise exception 'Approved organization does not exist';end if;
  select count(*) into target_count from auth.users where lower(email)=${quotedEmail};
  if target_count<>1 then raise exception 'Exactly one approved account is required';end if;
- select id into target_id from auth.users where lower(email)=${quotedEmail} and email_confirmed_at is not null for update;
+ select id into target_id from auth.users where lower(email)=${quotedEmail} and email_confirmed_at is not null and not coalesce(is_anonymous,false) for update;
  if target_id is null then raise exception 'The approved account must verify its email first';end if;
  select * into existing from public.staff_accounts where user_id=target_id for update;
  if existing.user_id is not null then
