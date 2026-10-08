@@ -35,12 +35,20 @@ try:
  ''')
  source=pathlib.Path('supabase/migrations/20261007074022_immutable_finance_journals.sql').read_text();start=source.index('create function private.guard_finance_immutable()');end=source.index('create trigger guard_finance_immutable',start);sql(source[start:end])
  sql(pathlib.Path('supabase/migrations/20261008074842_work_order_service_targets.sql').read_text())
+ sql(pathlib.Path('supabase/migrations/20261008155750_service_target_queue_summary.sql').read_text())
  sql(f"insert into public.organizations values('{org}'),('{foreign}');insert into auth.users values('{actor}',now(),false),('{outsider}',now(),false),('{anonymous}',now(),true);insert into public.staff_accounts values('{actor}','{org}','manager'),('{outsider}','{foreign}','manager'),('{anonymous}','{org}','manager');insert into public.work_orders values('{order}','{org}',3,'triaged'),('{foreign_order}','{foreign}',3,'triaged');")
  def identity(user=actor):return f"select set_config('request.jwt.claim.sub','{user}',true);set local role authenticated;"
  def command(request,version=0,kind='response',action='set',target=order,due="'2030-10-09T14:00:00Z'",work_version=3):return f"select public.record_work_order_service_target('{target}',{work_version},'{kind}',{version},'{action}',{due},'Approved target fixture',true,'{request}');"
  def execute(query,user=actor,error=None):return sql('begin;'+identity(user)+query+'commit;',error=error)
  req=str(uuid.uuid4());receipt=json.loads(execute(command(req)).splitlines()[-1]);assert receipt['version']==1 and receipt['work_order_version']==3
  assert json.loads(execute(command(req)).splitlines()[-1])==receipt
+ summary=f"select coalesce(jsonb_agg(s),'[]'::jsonb) from public.work_order_service_target_summary(array['{order}'::uuid,'{foreign_order}'::uuid]) s;"
+ assert len(json.loads(execute(summary).splitlines()[-1]))==1
+ assert json.loads(execute(summary,user=outsider).splitlines()[-1])==[]
+ assert json.loads(execute(summary,user=anonymous).splitlines()[-1])==[]
+ execute("select * from public.work_order_service_target_summary(array[]::uuid[]);",error='One to twenty-five')
+ execute("select * from public.work_order_service_target_summary(array_fill(gen_random_uuid(),array[26]));",error='One to twenty-five')
+ execute("select * from public.work_order_service_target_summary(array[null]::uuid[]);",error='One to twenty-five')
  execute(command(req,kind='resolution'),error='Request reference already used')
  execute(command(str(uuid.uuid4())),error='Target changed; refresh')
  execute(command(str(uuid.uuid4()),kind='resolution',due="'2020-01-01'"),error='New target must be in the future')
@@ -52,8 +60,16 @@ try:
  execute('delete from public.work_order_service_target_events;',error='permission denied')
  sql('update public.work_order_service_target_events set reason=\'Changed reason\';',error='immutable')
  clear=json.loads(execute(command(str(uuid.uuid4()),version=1,action='clear',due='null')).splitlines()[-1]);assert clear['version']==2 and clear['due_at'] is None
+ current=json.loads(execute(summary).splitlines()[-1]);assert len(current)==1 and current[0]['version']==2 and current[0]['action']=='clear' and current[0]['due_at'] is None
  sql(f"update public.work_orders set status='closed',revision=4 where id='{order}';")
  assert json.loads(execute(command(req)).splitlines()[-1])==receipt
+ summary=f"select coalesce(jsonb_agg(s),'[]'::jsonb) from public.work_order_service_target_summary(array['{order}'::uuid,'{foreign_order}'::uuid]) s;"
+ assert len(json.loads(execute(summary).splitlines()[-1]))==1
+ assert json.loads(execute(summary,user=outsider).splitlines()[-1])==[]
+ assert json.loads(execute(summary,user=anonymous).splitlines()[-1])==[]
+ execute("select * from public.work_order_service_target_summary(array[]::uuid[]);",error='One to twenty-five')
+ execute("select * from public.work_order_service_target_summary(array_fill(gen_random_uuid(),array[26]));",error='One to twenty-five')
+ execute("select * from public.work_order_service_target_summary(array[null]::uuid[]);",error='One to twenty-five')
  execute(command(str(uuid.uuid4()),version=2,work_version=4),error='Work order changed or closed')
  sql(f"update public.work_orders set status='triaged',revision=3 where id='{order}';")
  race=str(uuid.uuid4());first=session('begin;'+identity()+command(race,version=2)+'select pg_sleep(2);commit;');wait('PgSleep',first)
