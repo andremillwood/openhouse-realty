@@ -113,6 +113,9 @@ Acceptance: every balance can be explained; duplicate events never double-post; 
 - [ ] Demand, maintenance and contractor reporting; decisions and exceptions.
 - [ ] End-to-end permission matrix for every role, cross-organization isolation tests.
 - [ ] Accessibility/mobile checks, upload/security controls, consent/retention implementation.
+- [ ] Installable mobile web/PWA: branded standalone entry, installation guidance, safe offline/reconnect behavior, responsive role journeys and actual iPhone/Android acceptance.
+
+PWA checkpoint: manifest, Apple web-app metadata, install page, supplied app icon, production worker and static offline fallback implemented. Worker deliberately caches only public offline HTML and never queues mutations or caches private records. Automated worker/install interaction tests and TypeScript pass; final build/release and actual mobile viewport/installation acceptance remain open.
 - [ ] Monitoring, notification failures, backup/restore drill and operational runbooks.
 - [ ] Vercel preview, approved domain, production Auth callbacks, production deployment.
 - [ ] Client walkthrough, approved content and real-world acceptance checks.

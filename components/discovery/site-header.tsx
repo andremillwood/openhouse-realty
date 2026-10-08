@@ -29,6 +29,7 @@ export function SiteHeader() {
         <a href="/inventory">Live properties</a>
         <a href="/demo">Demo</a>
         <a href="/account">My account</a>
+        <a href="/install">Install web app</a>
       </nav>
       <a className="header-cta" href="/realtors#match">
         Find your realtor ↗
