@@ -1,0 +1,7 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict');
+function load(path){const m={exports:{}};new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(n=>n.startsWith('@/')?load(n.slice(2)+'.ts'):require(n),m.exports,m);return m.exports;}
+const {serviceTargetInput:parse}=load('lib/staff/service-targets.ts'),id='66117788-0000-4000-8000-000000000001';
+const base={work_order_id:id,work_order_version:3,kind:'response',version:0,action:'set',due_at:'2026-10-09T09:00',reason:'  Approved response target  ',approved:true,request_id:id};
+assert.equal(parse(base).p_due_at,'2026-10-09T14:00:00.000Z');assert.equal(parse(base).p_reason,'Approved response target');assert(Object.isFrozen(parse(base)));assert.equal(parse({...base,kind:'resolution',action:'clear',due_at:null}).p_due_at,null);
+for(const change of [{approved:false},{reason:'bad'},{version:-1},{version:0.5},{work_order_version:0},{version:2147483646},{due_at:'2026-02-30T09:00'},{due_at:'2026-10-09T09:00Z'},{due_at:'2100-01-01T09:00'},{kind:'rent'},{action:'complete'},{action:'clear'},{work_order_id:'bad'},{organization_id:id},{actor_user_id:id},{status:'completed'}])assert.throws(()=>parse({...base,...change}));
+console.log('PASS: explicitly approved service targets, Jamaica calendar/offset, current revisions, explained clear action and rejected identity/status fields');
