@@ -32,3 +32,7 @@ Read-only Vercel environment metadata on the approved project lists production k
 
 
 Configuration follow-up: generated `CRON_SECRET` and verified production-only sensitive metadata. No secret value persisted in source or output. Current deployed build predates this environment change; next deployment must consume it. `SUPABASE_SECRET_KEY` and `RESEND_WEBHOOK_SECRET` remain account-owner/provider configuration inputs. Scheduling and delivery acceptance remain unverified. Setup guide now uses the intended Vercel project rather than the retired alternate project.
+
+## Repeatable public release check
+
+Run `node scripts/verify-public-web.cjs` against the production origin (or pass a public preview/local origin as the first argument). It checks ten public pages, discovered same-origin anchor destinations excluding API/Auth mutation routes, and the anonymous account redirect. October 8 HTTPS audit passed ten pages and 20 discovered links. This does not prove signed-in permissions, submissions, delivered email, map interactions, responsive rendering or device installation. Browser automation retry failed at kernel startup with sandbox code 65; actual rendered/device checks remain outstanding.
