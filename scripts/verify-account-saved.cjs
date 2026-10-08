@@ -1,0 +1,19 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict'),{renderToStaticMarkup}=require('react-dom/server');
+const source=ts.transpileModule(fs.readFileSync('app/account/saved/page.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
+async function run({verified=true,anonymous=false,page='2',count=51,countError=false,rowError=false,rows=[{listing_id:'own-listing',listings:{id:'own-listing',title:'Garden home',area:'Kingston',status:'published'}}]}={}){
+ const calls=[],saves=[];const client={auth:{getUser:async()=>({data:{user:{id:'actual-account',email_confirmed_at:verified?'verified':null,is_anonymous:anonymous}},error:null})},from(table){assert.equal(table,'saved_listings');let head=false;const b={select(value,options){head=!!options?.head;calls.push(['select',value,options]);return b},eq(...args){calls.push(['eq',...args]);return b},order(...args){calls.push(['order',...args]);return b},range(...args){calls.push(['range',...args]);return b},then(resolve){resolve(head?{count,error:countError?{}:null}:{data:rows,error:rowError?{}:null})}};return b}};
+ const m={exports:{}};new Function('require','exports','module',source)(name=>name==='@/lib/supabase/server'?{createClient:async()=>client}:name==='next/navigation'?{redirect(url){throw {redirect:url}}}:name==='@/components/discovery/site-header'?{SiteHeader:()=>null}:name==='@/components/auth/save-property'?{SaveProperty:props=>{saves.push(props);return null;}}:require(name),m.exports,m);
+ try{return {html:renderToStaticMarkup(await m.exports.default({searchParams:Promise.resolve({page, user_id:'spoof'})})),calls,saves}}catch(error){return {error,calls,saves}}
+}
+(async()=>{
+ for(const config of [{verified:false},{anonymous:true}]){const r=await run(config);assert.equal(r.error.redirect,'/sign-in');assert.equal(r.calls.length,0);}
+ let r=await run();assert(!r.error);assert.deepEqual(r.calls.filter(c=>c[0]==='eq'),[['eq','user_id','actual-account'],['eq','user_id','actual-account']]);assert.deepEqual(r.calls.find(c=>c[0]==='range'),['range',25,49]);assert.deepEqual(r.calls.filter(c=>c[0]==='order'),[['order','created_at',{ascending:false}],['order','listing_id']]);assert.match(r.html,/Page 2 of 3/);assert.match(r.html,/href="\/listings\/own-listing"/);assert.deepEqual(r.saves,[{listingId:'own-listing',initialSaved:true,refreshAfterChange:true}]);
+ r=await run({page:'99'});assert.equal(r.error.redirect,'/account/saved?page=3');assert(!r.calls.some(c=>c[0]==='range'));
+ for(const count of [null,-1,1.5]){r=await run({count});assert(r.error);assert(!r.calls.some(c=>c[0]==='range'));}
+ for(const page of [['2'],'invalid','100000','0']){r=await run({page});assert.deepEqual(r.calls.find(c=>c[0]==='range'),['range',0,24]);}
+ r=await run({rowError:true});assert.match(r.html,/Unable to load saved properties/);assert.doesNotMatch(r.html,/Garden home/);assert.equal(r.saves.length,0);
+ for(const listing of [null,{id:'own-listing',title:'Private title',status:'paused'},{id:'foreign',title:'Private title',status:'published'}]){r=await run({rows:[{listing_id:'own-listing',listings:listing}]});assert.match(r.html,/Property currently unavailable/);assert.doesNotMatch(r.html,/Private title|href="\/listings\//);assert.equal(r.saves[0].listingId,'own-listing');}
+ r=await run({rows:[{listing_id:'own-listing',listings:[{id:'own-listing',title:'Garden home',status:'published'}]}]});assert.match(r.html,/Garden home/);
+ r=await run({page:'1',count:0,rows:[]});assert.match(r.html,/No saved properties/);assert.match(r.html,/Page 1 of 1/);
+ console.log('PASS: actual saved-property page verified/nonanonymous owner access, count-first bounded stable pagination, unavailable/mismatched listing protection and truthful read failures');
+})().catch(error=>{console.error(error);process.exitCode=1});

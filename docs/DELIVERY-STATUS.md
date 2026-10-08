@@ -2871,3 +2871,9 @@ Prospect account release 639e76976ecf1757431e2bd03aa26773202ab0d9 pushed to main
 ### 2026-10-08 — Public journey release smoke
 
 Read-only HTTPS audit of homepage, About, Services, Contact, Sell, Listings, Realtors, Open Houses, Install and Sign-in returned 200 for all ten; 20 discovered internal links had no HTTP faults. Saved repeatable public check in scripts/verify-public-web.cjs with bounded concurrency, timeouts and anonymous account redirect check. Browser automation retry still fails at kernel startup (sandbox code 65), so no rendered/mobile acceptance is claimed. Provider-choice clarification remains pending; full scope retained.
+
+### 2026-10-08 — Bounded saved-property return journey
+
+Added verified/nonanonymous `/account/saved` with owner-scoped count-first 25-row pagination, deterministic creation/listing order, out-of-range redirect and safe unavailable/mismatched listing display. Account dashboard now reads six recent saves and links the full shortlist. Saved controls preserve existing idempotent owner writes, add synchronous duplicate locking and an opt-in success-only refresh on the shortlist, keeping counts/pages current after removal. Actual rendered-page/control tests cover ownership, pagination, invalid totals/pages, unavailable relations, duplicate clicks, anonymous denial, mutation failures and optional refresh. All six account groups and TypeScript passed. Earlier build passed; final build 99775 is running after the refresh-control changes. No deployment or actual signed-in/device acceptance claimed yet. Signing/payment provider clarification and server/provider credentials remain pending; full scope remains active.
+
+Final saved-property build 99775 completed EXIT 0, including TypeScript, page generation and the new account/saved route. Preparing the verified web release; actual signed-in/device acceptance remains open.
