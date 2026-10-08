@@ -1,0 +1,9 @@
+const fs=require('fs'),ts=require('typescript'),assert=require('node:assert/strict');
+function load(path){const m={exports:{}};new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(n=>n.startsWith('@/')?load(n.slice(2)+'.ts'):require(n),m.exports,m);return m.exports;}const m={exports:load('lib/leases/signing.ts')};
+const {leaseSigningRequestInput:parse,requireLeaseSigningProvider:provider,LeaseSigningUnavailable}=m.exports;
+const id='55667788-0000-4000-8000-000000000001';const input={application_id:id,draft_id:id,draft_version:2,request_id:id,approval_reference:'  Business-approved signing request  ',signing_approved:true};
+const request=parse(input);assert(Object.isFrozen(request));assert.equal(request.approval_reference,'Business-approved signing request');assert.equal(input.approval_reference,'  Business-approved signing request  ');
+for(const bad of [null,[],{}, {...input,draft_version:0},{...input,draft_version:1.5},{...input,draft_version:2147483647},{...input,signing_approved:false},{...input,approval_reference:'x'},{...input,approval_reference:'x'.repeat(501)},{...input,draft_id:'bad'}])assert.throws(()=>parse(bad));
+for(const key of ['organization_id','actor_id','signers','provider','document_hash','signed','state','tenancy_id','rent_minor'])assert.throws(()=>parse({...input,[key]:'spoof'}));
+assert.throws(()=>provider(null),LeaseSigningUnavailable);assert.throws(()=>provider(undefined),LeaseSigningUnavailable);const approved={name:'adapter fixture'};assert.equal(provider(approved),approved);
+console.log('PASS: immutable signing intent, approval/revision/reference bounds, rejected client authority/party/document spoofing and unavailable-provider gate');
