@@ -1,0 +1,5 @@
+import {Text,View} from 'react-native';
+import {Link} from 'expo-router';
+import type {Home} from '../../../lib/discovery/data';
+import {styles} from './styles';
+export function DemoPropertyMap({homes}:{homes:Home[]}){return <View style={{gap:16}}><Text style={styles.body}>DEMO LOCATIONS · Fictional homes with approximate neighbourhood pins. Open an area in Maps, or explore the interactive map in the website demo.</Text><Link href="https://www.openhousejamaica.com/demo/listings" style={styles.link}>Open interactive website demo map ↗</Link>{homes.map(home=><View key={home.id} style={styles.card}><Text style={styles.heading}>{home.title}</Text><Text style={styles.body}>Demo · {home.area}</Text><Link href={`https://www.google.com/maps/search/?api=1&query=${home.lat},${home.lng}`} style={styles.link}>Explore approximate area ↗</Link><Link href={{pathname:'/demo-property',params:{id:home.id}}} style={styles.link}>View demo property →</Link></View>)}{!homes.length&&<Text style={styles.body}>No demo locations match. Try another search.</Text>}</View>}

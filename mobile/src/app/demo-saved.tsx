@@ -1,0 +1,7 @@
+import {ScrollView,Text,Pressable,View} from 'react-native';
+import {Link} from 'expo-router';
+import {homes} from '../../../lib/discovery/data';
+import {useDemoShortlist} from '../components/demo-shortlist';
+import {DiscoveryCard} from '../components/discovery-card';
+import {styles} from '../components/styles';
+export default function DemoSaved(){const {ids,clear}=useDemoShortlist();const rows=homes.filter(home=>ids.includes(home.id));return <ScrollView contentContainerStyle={styles.page}><Text style={styles.title}>Your demo shortlist.</Text><Text style={styles.body}>Keep the fictional homes that catch your eye. Demo saves stay in this app session and are separate from your verified account.</Text><Text style={styles.body} accessibilityLiveRegion="polite">{rows.length} saved demo {rows.length===1?'property':'properties'}</Text>{rows.length?rows.map(home=><DiscoveryCard key={home.id} home={home}/>):<View style={styles.card}><Text style={styles.heading}>Room for your next possibility.</Text><Text style={styles.body}>Save a demo home from the collection or its detail page, then come back here.</Text><Link href="/demo-listings" style={styles.link}>Explore demo properties →</Link></View>}{!!rows.length&&<Pressable accessibilityRole="button" onPress={clear}><Text style={styles.link}>Clear demo shortlist</Text></Pressable>}<Link href="/saved" style={styles.link}>Your live account’s saved properties →</Link></ScrollView>}

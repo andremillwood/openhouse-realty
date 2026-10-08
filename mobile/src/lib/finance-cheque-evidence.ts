@@ -2,6 +2,7 @@ import type {SupabaseClient} from '@supabase/supabase-js';
 import {financeAccess} from './finance-access';
 import {financeChequeBankHistory} from './finance-cheque-bank-history';
 import {validId} from './catalog';
+import {financeChequeDecisions} from './finance-cheque-decisions';
 export async function financeChequeEvidence(client:SupabaseClient,owner:string,id:string){
  if(!validId(id))throw Error('Valid cheque reference required.');const access=await financeAccess(client,owner);if(!access)throw Error('Verified finance access required.');const history=await financeChequeBankHistory(client,owner,id);
  const result=await client.from('cheque_bank_evidence').select('id,cheque_id,organization_id,user_id,kind,file_name,mime_type,state,sha256,actual_size,purged_at').eq('cheque_id',id).eq('organization_id',access.organization).eq('state','uploaded').order('id',{ascending:true}).limit(11);
@@ -9,6 +10,6 @@ export async function financeChequeEvidence(client:SupabaseClient,owner:string,i
  const rows=result.data.map(r=>{const raw=typeof r.actual_size==='string'?r.actual_size:Number.isSafeInteger(r.actual_size)?String(r.actual_size):'';if(!validId(r.id)||r.cheque_id!==id||r.organization_id!==access.organization||!validId(r.user_id)||r.state!=='uploaded'||r.purged_at!==null||!['deposit','clearance','return'].includes(r.kind)||typeof r.file_name!=='string'||!r.file_name.trim()||r.file_name.length>160||/[\u0000-\u001f\u007f/\\]/.test(r.file_name)||!['application/pdf','image/jpeg','image/png'].includes(r.mime_type)||typeof r.sha256!=='string'||!/^[a-f0-9]{64}$/.test(r.sha256)||!/^[1-9]\d{0,6}$/.test(raw)||Number(raw)>8388608)throw Error('Invalid certified bank document.');const frozen=history.rows.find(f=>f.evidence===r.id);if(frozen&&(frozen.kind!==r.kind||frozen.name!==r.file_name||frozen.mime!==r.mime_type||frozen.size!==Number(raw)))throw Error('Frozen document metadata differs.');return {id:r.id as string,uploader:r.user_id as string,kind:r.kind as 'deposit'|'clearance'|'return',name:r.file_name as string,mime:r.mime_type as string,size:Number(raw),usedVersion:frozen?.version??null};});
  if(new Set(rows.map(r=>r.id)).size!==rows.length||history.rows.some(f=>!rows.some(r=>r.id===f.evidence)))throw Error('Complete bank source records unavailable.');
  const latest=await financeChequeBankHistory(client,owner,id),current=await financeAccess(client,owner);if(latest.cheque.version!==history.cheque.version||latest.cheque.state!==history.cheque.state||JSON.stringify(latest.rows)!==JSON.stringify(history.rows)||!current||current.organization!==access.organization||current.role!==access.role||current.revision!==access.revision)throw Error('Cheque documents or authority changed.');
- const kinds=history.cheque.state==='received'?['deposit']:history.cheque.state==='deposited'?['clearance','return']:history.cheque.state==='cleared'?['return']:[];
+ const kinds=financeChequeDecisions(history.cheque.state).map(choice=>choice.kind);
  return {cheque:history.cheque,rows,available:rows.filter(r=>r.usedVersion===null&&kinds.includes(r.kind))};
 }

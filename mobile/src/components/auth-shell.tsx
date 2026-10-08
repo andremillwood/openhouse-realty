@@ -1,0 +1,19 @@
+import type {ReactNode} from 'react';
+import {Image,KeyboardAvoidingView,Platform,ScrollView,StyleSheet,Text,View} from 'react-native';
+import {Link} from 'expo-router';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+
+export function AuthShell({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}){
+ const insets=useSafeAreaInsets();
+ return <KeyboardAvoidingView style={s.screen} behavior={Platform.OS==='ios'?'padding':undefined}>
+  <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content,{paddingTop:insets.top+12,paddingBottom:insets.bottom+24}]}>
+   <Link href="/" style={s.back}>‹ Explore Open House</Link>
+   <View style={s.brand}><Image source={require('../../assets/logo-blue.png')} resizeMode="contain" accessibilityLabel="Open House Realty. Unlocking value, building connections." style={s.logo}/></View>
+   <View style={s.intro}><Text style={s.eyebrow}>PEOPLE. PROPERTY. POSSIBILITIES.</Text><Text accessibilityRole="header" style={s.title}>{title}</Text><Text style={s.subtitle}>{subtitle}</Text></View>
+   <View style={s.form}>{children}</View>
+   <View style={s.footer}><Text style={s.footerText}>Homes. People. Possibilities.</Text><Text style={s.footerSmall}>Jamaica and beyond.</Text><Link href="/demo-listings" style={s.demo}>Explore the demo collection →</Link></View>
+  </ScrollView>
+ </KeyboardAvoidingView>;
+}
+export const authStyles=StyleSheet.create({label:{fontFamily:'BrandStrong',fontSize:13,color:'#334155',marginBottom:-8},field:{gap:12},input:{fontFamily:'BrandBody',fontSize:16,color:'#0F172A',padding:16,minHeight:54,borderWidth:1,borderColor:'#D9E2ED',borderRadius:12,backgroundColor:'#F8FAFC'},passwordRow:{flexDirection:'row',alignItems:'center',borderWidth:1,borderColor:'#D9E2ED',borderRadius:12,backgroundColor:'#F8FAFC'},password:{fontFamily:'BrandBody',fontSize:16,color:'#0F172A',padding:16,minHeight:54,flex:1},toggle:{padding:14,minHeight:48},smallLink:{fontFamily:'BrandStrong',fontSize:13,color:'#003A8C'},button:{backgroundColor:'#003A8C',minHeight:54,justifyContent:'center',borderRadius:12,padding:16},disabled:{opacity:0.5},buttonText:{fontFamily:'BrandStrong',fontSize:16,color:'#fff',textAlign:'center'},message:{padding:14,borderRadius:12,backgroundColor:'#EFF6FF',fontFamily:'BrandBody',fontSize:14,lineHeight:22,color:'#334155'},divider:{height:1,backgroundColor:'#E2E8F0',marginVertical:2},hint:{fontFamily:'BrandBody',fontSize:12,lineHeight:19,color:'#64748B'},switch:{fontFamily:'BrandStrong',fontSize:14,lineHeight:22,color:'#003A8C',textAlign:'center',paddingVertical:10},check:{flexDirection:'row',gap:10,alignItems:'center',minHeight:48},checkBox:{width:24,height:24,borderRadius:6,borderWidth:1,borderColor:'#94A3B8',textAlign:'center',color:'#fff',backgroundColor:'#fff',overflow:'hidden'},checked:{backgroundColor:'#003A8C',borderColor:'#003A8C'},checkText:{flex:1,fontFamily:'BrandBody',fontSize:13,lineHeight:20,color:'#475569'}});
+const s=StyleSheet.create({screen:{flex:1,backgroundColor:'#F8FAFC'},content:{paddingHorizontal:24,flexGrow:1},back:{fontFamily:'BrandStrong',fontSize:13,color:'#003A8C',paddingVertical:12,alignSelf:'flex-start'},brand:{alignItems:'center',paddingVertical:8},logo:{width:230,height:116},intro:{gap:12,marginTop:12,marginBottom:24},eyebrow:{fontFamily:'BrandStrong',fontSize:10,letterSpacing:1.7,color:'#64748B'},title:{fontFamily:'BrandHeading',fontSize:38,lineHeight:44,color:'#003A8C'},subtitle:{fontFamily:'BrandBody',fontSize:15,lineHeight:23,color:'#52647B'},form:{backgroundColor:'#fff',borderWidth:1,borderColor:'#E2E8F0',borderRadius:22,padding:22,gap:20},footer:{alignItems:'center',gap:6,paddingTop:28},footerText:{fontFamily:'BrandHeading',fontSize:19,color:'#003A8C'},footerSmall:{fontFamily:'BrandBody',fontSize:12,color:'#64748B'},demo:{fontFamily:'BrandStrong',fontSize:13,color:'#003A8C',padding:14}});
