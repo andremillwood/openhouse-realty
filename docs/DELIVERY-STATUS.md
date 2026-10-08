@@ -2819,3 +2819,9 @@ PWA initial build 91319 exited 0. Final build 37601 started after later install-
 Full regression session 86258 exited 0: 58/58 verification groups passed, including PWA, staff identity guard and native regressions. Final PWA build 37601 remains live at last observation; release has not yet been pushed.
 
 Final PWA build 37601 exited 0. Local built HTTP checks passed 200 for install/manifest/worker/offline/icon, standalone scope, emitted mobile-web-app metadata/Apple touch icon and worker no-store/scope headers. Initial smoke assertion expected deprecated Apple-capable tag; corrected to the installed Next emitter’s mobile-web-app-capable output, then reran successfully. Temporary runtime stopped. These checks do not establish actual phone installation or responsive visual acceptance.
+
+### PWA production and maintenance queue filtering
+
+PWA commit a54c294 pushed to main; intended production deployment dpl_CaVbdK39cG95AAHGBw27H6m4oGDk verified READY. Added priority and bounded literal-title search to organization-scoped work order queue, retaining filters in pagination/canonical redirects and clear-filter navigation. Escaped SQL LIKE wildcards to prevent accidental broad matches. Exact count errors/null now fail closed instead of displaying zero. Actual page regression verifies own-organization count/row filters, unknown/array/oversized inputs, literal wildcard binding and retained filters. Work-order API/page suite and TypeScript passed. Production build 73375 remains live. Actual signed-in manager/mobile acceptance remains open.
+
+Maintenance queue production build 73375 exited 0. Public PWA HTTPS smoke 1739 exited 0 on www.openhousejamaica.com for install/manifest/worker/offline/icon including worker no-store and scope headers. These are runtime endpoint checks, not installed device acceptance.
