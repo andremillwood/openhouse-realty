@@ -27,8 +27,15 @@ const tools = [
   {href: '/staff/finance/trial-balance', label: 'Trial balance', roles: ['admin','finance']},
   {href: '/security', label: 'Check property entry permits', roles: ['security']}
 ];
+const groups=[
+ {title:'Prospects and property',description:'Manage your catalog, conversations and appointments.',matches:(href:string)=>['/staff','/staff/enquiries','/staff/viewings','/staff/sellers','/staff/applications','/staff/open-houses','/staff/reports/demand','/staff/lease-reviews'].includes(href)},
+ {title:'Property management',description:'Coordinate properties, maintenance and contractor work.',matches:(href:string)=>['/staff/properties','/staff/work-orders','/staff/preventive-plans','/staff/contractors','/staff/reports/contractors','/staff/reports/maintenance','/security'].includes(href)},
+ {title:'Finance',description:'Review evidence, custody and retained financial records.',matches:(href:string)=>href.startsWith('/staff/finance/')},
+ {title:'Team and controls',description:'Manage approved access, policies and delivery monitoring.',matches:(href:string)=>['/staff/notifications','/staff/application-policy','/staff/lease-templates','/staff/owner-access','/staff/memberships','/staff/invitations'].includes(href)},
+];
 export async function StaffNavigation() {
   const {user, membership} = await catalogAccess(['admin','realtor','manager','finance','security']);
   if (!user || !membership) return null;
-  return <section><h2>Your team tools</h2><nav aria-label="Team tools"><ul>{tools.filter(tool => tool.roles.includes(membership.role)).map(tool => <li key={tool.href}><a href={tool.href}>{tool.label}</a></li>)}</ul></nav></section>;
+  const allowed=tools.filter(tool=>tool.roles.includes(membership.role));
+  return <section className="team-tools"><h2>Your team tools</h2><a href="/workspace">Open team workspace ↗</a><nav className="team-tool-grid" aria-label="Team tools">{groups.map(group=>{const links=allowed.filter(tool=>group.matches(tool.href));return links.length?<section className="team-tool-group" key={group.title}><h3>{group.title}</h3><p>{group.description}</p><ul>{links.map(tool=><li key={tool.href}><a href={tool.href}>{tool.label} ↗</a></li>)}</ul></section>:null;})}</nav></section>;
 }

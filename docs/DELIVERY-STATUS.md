@@ -2769,3 +2769,19 @@ Final pre-callback handoff build session 86329 exited 0. Signup confirmation URL
 Confirmation build session 58917 exited 0 before subsequent sign-in guards. Web form now blocks synchronous duplicate/completed submission, locks input during activity, creates client within guarded try/finally and checks fresh authenticated verified/nonanonymous actor against sign-in result before redirect. Actual form test passes mismatch denial, corrected retry, duplicate guard and completed lock; callback tests still pass. Added both tests to test:account. Root TypeScript session 65847 passed before final small try placement; final account/type/build verification started next. Live Auth delivery and complete browser acceptance remain open.
 
 Final web authentication release verification session 96188 completed exit 0: account regression including new form/callback tests, TypeScript and production build. Selective release keeps move-in migration/UI and mobile refinements unstaged; account regression registration is staged independently of the pending move-in test script. Real email/browser acceptance remains open.
+
+### Team workspace usability
+
+Web auth commit 3463a48 pushed to main; correct deployment dpl_77Y5VXojJtXVdLLQdWTdaaQzkZXK verified READY on approved production aliases. Replaced long account staff-tools list with role-filtered grouped prospect/property, management, finance and team/control navigation. Added protected /workspace entry with verified staff membership and sign-in continuation. Navigation tests pass for role isolation and all administrator groups; callback test passes after allowing only this specific protected continuation. Workspace accesses and workflows still independently enforce permissions. Root TypeScript session 12475 exited 0 before final continuation-only edits; current production build is next. Live staff walkthrough and visual acceptance remain open.
+
+### Workspace access and operational return paths
+
+Actual workspace page tests pass for signed-out sign-in continuation, membership denial and verified render. Role-navigation tests remain passing; all admin groups checked. Added Team workspace return links on catalog, enquiry inbox, private properties and work orders. Included page tests in staff-navigation regression. Catalog authoring/history/editor/pagination checks pass. TypeScript session 34315 and existing build session 82149 live at last observation; no restart. Later return-link edits require final build verification before release. Updated web launch matrix with observed marketing/auth production release evidence while retaining live email/browser/role acceptance gaps.
+
+### Public crawl metadata
+
+Build session 82149 confirmed live via local process next-build v16.3.8; no restart on quiet output. Staff-navigation and workspace access tests session 97231 exited 0. Added Next metadata sitemap for public home/company/services/contact/listings/realtors/sell/open-houses paths using approved www domain; robots points to sitemap and excludes operational/auth/API/demo routes from crawl. Robots is crawl guidance, not access control; existing route authorization remains required. Read installed Next sitemap/robots guides before implementation. Final build must include these later additions before release.
+
+### Production onboarding launch prerequisite
+
+Read-only intended Supabase counts: published listings 0, published realtors 0, verified/nonanonymous staff memberships 0, managed properties 0, units 0. Requested first administrator email/organization via pending async input; approved content and management onboarding also remain necessary. No inference that Auth user table is empty. Browser tool failed with sandbox-exec kernel code 65; no visual claim. Workspace final build session 17490 remains live at last observation.
