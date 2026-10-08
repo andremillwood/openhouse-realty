@@ -23,3 +23,12 @@ export class LeaseSigningUnavailable extends Error{
 export function requireLeaseSigningProvider<T>(provider:T|null|undefined):T{
  if(provider==null)throw new LeaseSigningUnavailable();return provider;
 }
+
+export function leaseSigningWithdrawalInput(value:unknown){
+ if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('Check the signing withdrawal.');
+ const input=value as Record<string,unknown>;
+ if(Object.keys(input).some(key=>!['signing_id','request_id','reason','approved'].includes(key)))throw new Error('Withdrawal authority must come from verified records.');
+ for(const key of ['signing_id','request_id'])if(typeof input[key]!=='string'||!uuidPattern.test(input[key] as string))throw new Error('Valid signing and request references required.');
+ if(input.approved!==true||typeof input.reason!=='string'||input.reason.length>500||input.reason.trim().length<5)throw new Error('Approve withdrawal and record a reason.');
+ return Object.freeze({p_signing_id:input.signing_id as string,p_request_id:input.request_id as string,p_reason:input.reason.trim(),p_approved:true});
+}
