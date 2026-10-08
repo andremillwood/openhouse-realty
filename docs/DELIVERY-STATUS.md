@@ -2891,3 +2891,7 @@ Active application action release ff21ddb82cadf7c7ac0b69d223b1c4bbb056b8ef pushe
 ### 2026-10-08 — Substantial lifecycle/onboarding dependency audit
 
 Read-only intended-project readiness query confirms requested admin email is not registered/verified, and zero verified staff, published listings, published realtor profiles, managed properties and units. Realtor publication uses is_published (corrected initial read-only query after missing-column error). Tenancy audit still confirms no verified execution/payment/activation/renewal/move-out schema. Provider selection remains pending. Consolidated concrete external launch inputs in docs/LAUNCH-INPUTS.md rather than implying interface tweaks finish the full scope. Browser failure, server/provider credentials, legal/business rules and actual role inventory prevent full acceptance. Goal remains active; no completion claim.
+
+### 2026-10-08 — Existing mobile demo refinements verified
+
+Mobile TypeScript session 25843 and zero-warning lint session 28687 completed EXIT 0. All-platform Expo export session 67772 completed EXIT 0 with web, iOS and Android bundles. Existing header/login refinements provide a centered max-width header, responsive wordmark and adjusted auth controls/link spacing. Splash configuration is supplied by app.config.ts (not only app.json). No physical-device appearance, installed binary or client distribution is asserted. Web launch remains priority; required admin/service/provider/business inputs remain outstanding.
