@@ -13,3 +13,7 @@ Validation: mobile TypeScript and lint passed; Expo public config resolved the i
 Preview sign-in and registration by opening Account in the running app. Expo Go cannot reproduce the complete native launch experience. Validate the home-screen app icon, Android adaptive mask and splash transition in a signed installed release build. An EAS project and platform application identifiers/signing setup are still required before distributing such a build to the client.
 
 8 October refinement: shared branded header and navy authentication introduction implemented. TypeScript, lint, mobile experience regression checks and iOS/Android/web export passed for this revision. Browser visual inspection was blocked by the UI automation runtime failure; physical device visual review remains required.
+
+Additional presentation refinement: centered wordmark with symmetrical 44-point back/account controls, Playfair page headings, and a narrower authentication form capped at 520 points for tablets. Native splash uses a 350 ms fade after fonts resolve. Mobile typecheck and lint passed. UI automation failed to initialize, so physical-device visual acceptance is still required.
+
+All-platform export passed after clearing the stale Metro cache: `/private/tmp/openhouse-brand-refinement-20261008`. Mobile experience regression checks passed. These checks confirm compilation/navigation, not physical-device visual acceptance.
