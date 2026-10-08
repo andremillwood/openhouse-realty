@@ -4,9 +4,9 @@ The application lives on `foundation/production-v1` in `andremillwood/openhouse-
 
 ## Vercel
 
-Use project `openhouse-realty` (`prj_YmRK1L6UgDsFAcvYLgzEhZSqMUXW`), team `team_9ChwYlVHThc1yEj4aJunzMF6`. Local linkage is stored in ignored `.vercel/project.json`.
+Use project `openhouse-realty-i43c` (`prj_OILsP4sqPp0gNU2CSciu4HhILKw4`), team `team_9ChwYlVHThc1yEj4aJunzMF6`. Local linkage is stored in ignored `.vercel/project.json`.
 
-The Supabase URL, publishable key, and encrypted Resend key are configured for development, preview, and production. Environment changes apply to subsequent deployments.
+The October 8 metadata audit verified public app/Supabase settings and Resend API/sender/recipient variables in production. Preview/development configuration is not established by this audit. Environment changes apply to subsequent deployments.
 
 ## Supabase
 
@@ -28,7 +28,7 @@ The public marketplace now reads published Supabase inventory; examples are isol
 
 `lib/email.ts` provides a server-only transactional email helper with provider error handling and idempotency keys. `sendEnquiryNotification` routes business notifications to the configured enquiry inbox.
 
-Local and Vercel configuration uses `RESEND_FROM_EMAIL="Open House Realty <notifications@openhousejamaica.com>"` and `ENQUIRY_TO_EMAIL=ohrealty@flashcreate.co`. The recipient is temporary until an official inbox is provided. No email has been sent during setup; the enquiry UI workflow is not yet implemented.
+Local and Vercel configuration uses `RESEND_FROM_EMAIL="Open House Realty <notifications@openhousejamaica.com>"` and `ENQUIRY_TO_EMAIL=ohrealty@flashcreate.co`. The recipient is temporary until an official inbox is provided. The enquiry UI, persisted intake, transactional outbox and delivery monitor are implemented. Real production dispatch/delivery acceptance remains outstanding.
 
 The supplied Resend key is send-only; the domain-list API returned `restricted_api_key`. The user supplied a Resend dashboard screenshot confirming `openhousejamaica.com` is verified for sending.
 
@@ -271,3 +271,20 @@ Legal template upload cleanup: schedule authenticated GET `/api/jobs/lease-templ
 Native registration uses PKCE and `openhouse-realty://auth/confirm`. Add the exact redirect to Supabase Authentication URL Configuration only for the configured Open House mobile application. Verify the mail template respects the requested redirect, email confirmation remains enabled, and confirmation opens the same installed app/device that started registration. Expo Go is not the production scheme acceptance environment. This setup has not been activated or verified with live email/device delivery.
 
 Native password recovery also requires the exact redirect `openhouse-realty://auth/recover`. Verify the installed app handles this route and the emailed recovery redirect preserves the original PKCE flow. Live delivery and device recovery remain unverified.
+
+
+## Remaining production configuration — October 8, 2026
+
+Approved project settings: https://vercel.com/andre-millwoods-projects/openhouse-realty-i43c/settings/environment-variables . Live origin: https://www.openhousejamaica.com . Do not provision another project.
+
+`CRON_SECRET` has been generated cryptographically and stored as a production-only sensitive Vercel variable. Its value is not stored in this document or repository. A new deployment is required to consume it; scheduling has not been enabled.
+
+Configure these remaining secrets directly in the protected Vercel production environment, without sharing their values in chat:
+
+1. `SUPABASE_SECRET_KEY`: the intended Open House Supabase project's server-side secret, never its publishable key and never a `NEXT_PUBLIC_` variable. Account-owner setup is needed; the connected database plugin does not supply an Auth-admin/server credential.
+2. `RESEND_WEBHOOK_SECRET`: register the callback `https://www.openhousejamaica.com/api/webhooks/resend` in Resend and use that webhook's provider-issued signing secret. Supported delivery events in the current code are `email.sent`, `email.delivered`, `email.delivery_delayed`, `email.bounced`, `email.complained`, `email.failed`, and `email.suppressed`. A locally generated unrelated value cannot verify the provider's callbacks.
+3. Redeploy after configuration. Verify an approved real enquiry reaches `ohrealty@flashcreate.co`, then check the staff delivery monitor for verified provider events. Provider acceptance alone is not proof of inbox delivery.
+4. Configure and verify protected scheduling for `/api/jobs/notifications` and the five cleanup routes under `/api/jobs/`: documents, contractor-evidence, cheque-evidence, invoice-evidence and lease-template-documents. Choose notification cadence and cleanup cadence with the deployed platform's supported scheduler. Do not claim recurring operation until observed runs succeed.
+5. Independently verify Supabase Auth SMTP, Site URL, exact callback allowlist, signup confirmation and password recovery from the deployed web origin. Resend business notifications do not establish Auth email delivery.
+
+Actual first-administrator provisioning, approved staff/catalog inventory, provider/legal/payment decisions and signed-in/device acceptance remain separate launch inputs.
